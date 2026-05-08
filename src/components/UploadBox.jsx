@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { UploadCloud, File, X } from 'lucide-react';
+import { UploadCloud, File, X, Sparkles } from 'lucide-react';
 import './UploadBox.css';
 
 const ACCEPTED_TYPES = {
@@ -94,6 +94,18 @@ export default function UploadBox() {
     setFiles((prev) => prev.filter((f) => f.name !== name));
   }, []);
 
+  const embedFile = useCallback((file) => {
+    // eslint-disable-next-line no-console
+    console.log('Embedding:', file.name);
+    // Replace with actual embedding logic when connected to backend
+  }, []);
+
+  const embedAllFiles = useCallback(() => {
+    // eslint-disable-next-line no-console
+    console.log('Embedding all files:', files.map((f) => f.name));
+    // Replace with actual batch embedding logic when connected to backend
+  }, [files]);
+
   return (
     <div className="upload-stage">
       <div
@@ -128,9 +140,21 @@ export default function UploadBox() {
         <ul className="file-list" aria-label="Selected files">
           {files.map((file) => (
             <li className="file-item" key={file.name}>
-              <File size={18} />
+              <File className="file-icon" size={18} />
               <span className="file-name">{file.name}</span>
               <span className="file-size">{formatSize(file.size)}</span>
+              <button
+                className="file-embed"
+                type="button"
+                aria-label={`Proceed embedding ${file.name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  embedFile(file);
+                }}
+              >
+                <Sparkles size={14} />
+                <span>Embed</span>
+              </button>
               <button
                 className="file-remove"
                 type="button"
@@ -145,6 +169,17 @@ export default function UploadBox() {
             </li>
           ))}
         </ul>
+      )}
+
+      {files.length > 0 && (
+        <button
+          className="embed-all-button"
+          type="button"
+          onClick={embedAllFiles}
+        >
+          <Sparkles size={18} />
+          <span>Proceed all files embedding</span>
+        </button>
       )}
     </div>
   );
