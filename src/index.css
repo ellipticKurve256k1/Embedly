@@ -291,6 +291,7 @@ input {
 
 .settings-shell {
   grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
 }
 
 .settings-content {
@@ -299,8 +300,8 @@ input {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: clamp(24px, 4vh, 42px);
-  padding: clamp(12px, 1.5vw, 18px) clamp(10px, 1.2vw, 16px) 0;
+  gap: clamp(10px, 1.5vh, 16px);
+  padding: 0 clamp(10px, 1.2vw, 16px) 0;
 }
 
 .settings-heading {
@@ -317,7 +318,7 @@ input {
 
 .settings-heading h1 {
   color: #17213b;
-  font-size: clamp(26px, 3vw, 34px);
+  font-size: clamp(20px, 2.5vw, 28px);
   line-height: 1.1;
   font-weight: 800;
 }
@@ -340,17 +341,17 @@ input {
 .settings-nav {
   display: grid;
   align-content: start;
-  gap: 12px;
-  padding: clamp(18px, 2.3vw, 30px) clamp(10px, 1.2vw, 18px) 0 0;
+  gap: 6px;
+  padding: 6px clamp(10px, 1.2vw, 18px) 0 0;
   border-right: 1px solid rgba(132, 146, 184, 0.18);
 }
 
 .settings-nav-item {
-  min-height: 54px;
+  min-height: 42px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 18px;
+  gap: 12px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 12px;
   color: #65718b;
@@ -385,8 +386,8 @@ input {
   overflow: auto;
   display: grid;
   align-content: start;
-  gap: 22px;
-  padding: clamp(18px, 2.3vw, 30px) 0 clamp(4px, 1vw, 14px) clamp(22px, 3.2vw, 42px);
+  gap: 12px;
+  padding: 6px 0 clamp(4px, 1vw, 14px) clamp(22px, 3.2vw, 42px);
 }
 
 .settings-detail-heading {
@@ -404,19 +405,19 @@ input {
 
 .model-options {
   display: grid;
-  gap: 18px;
+  gap: 10px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
 .model-card {
-  min-height: 94px;
+  min-height: 72px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 16px;
-  padding: 20px 22px;
+  gap: 12px;
+  padding: 14px 16px;
   border: 1px solid rgba(132, 146, 184, 0.18);
   border-radius: 14px;
   color: #17213b;
@@ -513,12 +514,12 @@ input {
 
 .advanced-option {
   position: relative;
-  min-height: 76px;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 18px 22px;
+  gap: 14px;
+  padding: 14px 16px;
   border: 1px solid rgba(132, 146, 184, 0.18);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.72);
@@ -576,7 +577,7 @@ input {
 }
 
 .save-button {
-  min-height: 64px;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -691,8 +692,8 @@ input {
 
   .settings-content {
     overflow: auto;
-    gap: 18px;
-    padding: 4px 0 0;
+    gap: 8px;
+    padding: 2px 0 0;
   }
 
   .settings-heading h1 {
@@ -712,10 +713,24 @@ input {
 
   .settings-nav {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     overflow-x: auto;
-    padding: 14px 0 6px;
+    padding: 10px 0 4px;
     border-right: 0;
+  }
+
+  .settings-nav-item {
+    min-height: 38px;
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .settings-detail {
+    overflow: visible;
+    gap: 10px;
+    padding: 8px 0 0;
   }
 
   .settings-nav-item {
@@ -728,8 +743,8 @@ input {
 
   .settings-detail {
     overflow: visible;
-    gap: 16px;
-    padding: 16px 0 0;
+    gap: 10px;
+    padding: 8px 0 0;
   }
 
   .model-options {
