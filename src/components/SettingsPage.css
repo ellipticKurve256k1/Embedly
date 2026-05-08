@@ -64,8 +64,11 @@
   border: 1px solid transparent;
   border-radius: 12px;
   color: #65718b;
+  background: transparent;
   font-size: 14px;
   font-weight: 750;
+  text-align: left;
+  cursor: pointer;
   transition:
     background 160ms ease,
     border-color 160ms ease,

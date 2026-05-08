@@ -18,15 +18,16 @@ import './SettingsPage.css';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
 const EMBEDDING_SETUP_STORAGE_KEY = 'embeddly.embeddingSetup';
+const LLM_SETUP_STORAGE_KEY = 'embeddly.llmSetup';
 
 const settingTabs = [
-  { label: 'Embedding Model', icon: Zap, active: true },
-  { label: 'Retrieval', icon: Search },
-  { label: 'Generation', icon: WandSparkles },
-  { label: 'Data Sources', icon: Database },
-  { label: 'Security', icon: LockKeyhole },
-  { label: 'Advanced', icon: SlidersHorizontal },
-  { label: 'About', icon: CircleHelp },
+  { id: 'embedding', label: 'Embedding Model', icon: Zap },
+  { id: 'retrieval', label: 'Retrieval', icon: Search },
+  { id: 'generation', label: 'Generation', icon: WandSparkles },
+  { id: 'data-sources', label: 'Data Sources', icon: Database },
+  { id: 'security', label: 'Security', icon: LockKeyhole },
+  { id: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
+  { id: 'about', label: 'About', icon: CircleHelp },
 ];
 
 const embeddingProviders = [
@@ -39,18 +40,37 @@ const embeddingProviders = [
   },
 ];
 
+const llmProviders = [
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    summary: 'Use local language models served by Ollama for generation.',
+    icon: Server,
+    component: OllamaLlmSetup,
+  },
+];
+
 export default function SettingsPage() {
+  const [activeSection, setActiveSection] = useState('embedding');
   const [embeddingSetup, setEmbeddingSetup] = useState(readSavedEmbeddingSetup);
+  const [llmSetup, setLlmSetup] = useState(readSavedLlmSetup);
   const [selectedProvider, setSelectedProvider] = useState(
     embeddingSetup?.provider ?? embeddingProviders[0].id,
   );
   const [selectedModel, setSelectedModel] = useState(embeddingSetup?.model ?? '');
   const [isEditingSetup, setIsEditingSetup] = useState(!embeddingSetup);
+  const [selectedLlmProvider, setSelectedLlmProvider] = useState(
+    llmSetup?.provider ?? llmProviders[0].id,
+  );
+  const [selectedLlmModel, setSelectedLlmModel] = useState(llmSetup?.model ?? '');
+  const [isEditingLlmSetup, setIsEditingLlmSetup] = useState(!llmSetup);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const activeProvider = embeddingProviders.find((provider) => provider.id === selectedProvider);
   const ActiveProviderSetup = activeProvider?.component;
+  const activeLlmProvider = llmProviders.find((provider) => provider.id === selectedLlmProvider);
+  const ActiveLlmProviderSetup = activeLlmProvider?.component;
 
-  const handleSaveChanges = () => {
+  const handleSaveEmbeddingChanges = () => {
     if (!selectedProvider || !selectedModel) {
       return;
     }
@@ -64,6 +84,22 @@ export default function SettingsPage() {
     window.localStorage.setItem(EMBEDDING_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
     setEmbeddingSetup(nextSetup);
     setIsEditingSetup(false);
+  };
+
+  const handleSaveLlmChanges = () => {
+    if (!selectedLlmProvider || !selectedLlmModel) {
+      return;
+    }
+
+    const nextSetup = {
+      provider: selectedLlmProvider,
+      model: selectedLlmModel,
+      endpoint: OLLAMA_BASE_URL,
+    };
+
+    window.localStorage.setItem(LLM_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
+    setLlmSetup(nextSetup);
+    setIsEditingLlmSetup(false);
   };
 
   return (
@@ -86,105 +122,60 @@ export default function SettingsPage() {
 
           <div className="settings-panel">
             <nav className="settings-nav" aria-label="Settings sections">
-              {settingTabs.map(({ label, icon: Icon, active }) => (
-                <a
-                  className={`settings-nav-item${active ? ' is-active' : ''}`}
-                  href="#settings"
+              {settingTabs.map(({ id, label, icon: Icon }) => (
+                <button
+                  className={`settings-nav-item${activeSection === id ? ' is-active' : ''}`}
                   key={label}
+                  type="button"
+                  onClick={() => setActiveSection(id)}
                 >
                   <Icon size={18} />
                   <span>{label}</span>
-                </a>
+                </button>
               ))}
             </nav>
 
-            <section className="settings-detail" aria-labelledby="embedding-model-title">
-              <div className="settings-detail-heading">
-                <h2 id="embedding-model-title">Embedding Model</h2>
-                <p>
-                  {embeddingSetup
-                    ? 'Manage the embedding provider used for indexing and semantic search.'
-                    : 'Set up an embedding provider before indexing and semantic search can run.'}
-                </p>
-              </div>
+            {activeSection === 'embedding' && (
+              <EmbeddingSettingsPanel
+                embeddingSetup={embeddingSetup}
+                selectedProvider={selectedProvider}
+                selectedModel={selectedModel}
+                isEditingSetup={isEditingSetup}
+                advancedOptionsEnabled={advancedOptionsEnabled}
+                ActiveProviderSetup={ActiveProviderSetup}
+                onAdvancedOptionsChange={setAdvancedOptionsEnabled}
+                onEditSetup={() => setIsEditingSetup(true)}
+                onSave={handleSaveEmbeddingChanges}
+                onSelectModel={setSelectedModel}
+                onSelectProvider={(providerId) => {
+                  setSelectedProvider(providerId);
+                  setSelectedModel('');
+                }}
+              />
+            )}
 
-              {embeddingSetup && !isEditingSetup ? (
-                <ConfiguredEmbeddingModel
-                  setup={embeddingSetup}
-                  onEdit={() => setIsEditingSetup(true)}
-                />
-              ) : (
-                <>
-                  <fieldset className="model-options provider-options">
-                    <legend className="sr-only">Embedding provider options</legend>
-                    {embeddingProviders.map((provider) => {
-                      const Icon = provider.icon;
+            {activeSection === 'generation' && (
+              <GenerationSettingsPanel
+                llmSetup={llmSetup}
+                selectedProvider={selectedLlmProvider}
+                selectedModel={selectedLlmModel}
+                isEditingSetup={isEditingLlmSetup}
+                advancedOptionsEnabled={advancedOptionsEnabled}
+                ActiveProviderSetup={ActiveLlmProviderSetup}
+                onAdvancedOptionsChange={setAdvancedOptionsEnabled}
+                onEditSetup={() => setIsEditingLlmSetup(true)}
+                onSave={handleSaveLlmChanges}
+                onSelectModel={setSelectedLlmModel}
+                onSelectProvider={(providerId) => {
+                  setSelectedLlmProvider(providerId);
+                  setSelectedLlmModel('');
+                }}
+              />
+            )}
 
-                      return (
-                        <label
-                          className={`model-card provider-card${
-                            selectedProvider === provider.id ? ' is-selected' : ''
-                          }`}
-                          key={provider.id}
-                        >
-                          <input
-                            type="radio"
-                            name="embedding-provider"
-                            checked={selectedProvider === provider.id}
-                            onChange={() => {
-                              setSelectedProvider(provider.id);
-                              setSelectedModel('');
-                            }}
-                          />
-                          <span className="provider-icon" aria-hidden="true">
-                            <Icon size={20} />
-                          </span>
-                          <span className="model-copy">
-                            <span className="model-title-row">
-                              <strong>{provider.name}</strong>
-                              <em>Local</em>
-                            </span>
-                            <small>{provider.summary}</small>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </fieldset>
-
-                  {ActiveProviderSetup && (
-                    <ActiveProviderSetup
-                      endpoint={OLLAMA_BASE_URL}
-                      selectedModel={selectedModel}
-                      onSelectModel={setSelectedModel}
-                    />
-                  )}
-                </>
-              )}
-
-              <label className={`advanced-option${advancedOptionsEnabled ? ' is-on' : ''}`}>
-                <span>
-                  <strong>Advanced options</strong>
-                  <small>Fine-tune batch size, dimensions, and other model parameters.</small>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={advancedOptionsEnabled}
-                  onChange={(event) => setAdvancedOptionsEnabled(event.target.checked)}
-                  aria-label="Enable advanced options"
-                />
-                <span className="toggle" aria-hidden="true" />
-              </label>
-
-              <button
-                className="save-button"
-                type="button"
-                disabled={!selectedModel}
-                onClick={handleSaveChanges}
-              >
-                <Save size={18} />
-                <span>{embeddingSetup ? 'Save changes' : 'Save setup'}</span>
-              </button>
-            </section>
+            {activeSection !== 'embedding' && activeSection !== 'generation' && (
+              <PlaceholderSettingsPanel section={settingTabs.find((tab) => tab.id === activeSection)} />
+            )}
           </div>
         </div>
       </section>
@@ -192,7 +183,7 @@ export default function SettingsPage() {
   );
 }
 
-function ConfiguredEmbeddingModel({ setup, onEdit }) {
+function ConfiguredModelCard({ setup, onEdit }) {
   return (
     <article className="configured-model-card">
       <span className="provider-icon" aria-hidden="true">
@@ -211,7 +202,250 @@ function ConfiguredEmbeddingModel({ setup, onEdit }) {
   );
 }
 
+function EmbeddingSettingsPanel({
+  embeddingSetup,
+  selectedProvider,
+  selectedModel,
+  isEditingSetup,
+  advancedOptionsEnabled,
+  ActiveProviderSetup,
+  onAdvancedOptionsChange,
+  onEditSetup,
+  onSave,
+  onSelectModel,
+  onSelectProvider,
+}) {
+  return (
+    <section className="settings-detail" aria-labelledby="embedding-model-title">
+      <div className="settings-detail-heading">
+        <h2 id="embedding-model-title">Embedding Model</h2>
+        <p>
+          {embeddingSetup
+            ? 'Manage the embedding provider used for indexing and semantic search.'
+            : 'Set up an embedding provider before indexing and semantic search can run.'}
+        </p>
+      </div>
+
+      {embeddingSetup && !isEditingSetup ? (
+        <ConfiguredModelCard setup={embeddingSetup} onEdit={onEditSetup} />
+      ) : (
+        <>
+          <ProviderOptions
+            legend="Embedding provider options"
+            name="embedding-provider"
+            providers={embeddingProviders}
+            selectedProvider={selectedProvider}
+            onSelectProvider={onSelectProvider}
+          />
+
+          {ActiveProviderSetup && (
+            <ActiveProviderSetup
+              endpoint={OLLAMA_BASE_URL}
+              selectedModel={selectedModel}
+              onSelectModel={onSelectModel}
+            />
+          )}
+        </>
+      )}
+
+      <AdvancedOption
+        enabled={advancedOptionsEnabled}
+        label="Advanced options"
+        summary="Fine-tune batch size, dimensions, and other model parameters."
+        onChange={onAdvancedOptionsChange}
+      />
+
+      <SaveSettingsButton
+        disabled={!selectedModel}
+        label={embeddingSetup ? 'Save changes' : 'Save setup'}
+        onClick={onSave}
+      />
+    </section>
+  );
+}
+
+function GenerationSettingsPanel({
+  llmSetup,
+  selectedProvider,
+  selectedModel,
+  isEditingSetup,
+  advancedOptionsEnabled,
+  ActiveProviderSetup,
+  onAdvancedOptionsChange,
+  onEditSetup,
+  onSave,
+  onSelectModel,
+  onSelectProvider,
+}) {
+  return (
+    <section className="settings-detail" aria-labelledby="generation-title">
+      <div className="settings-detail-heading">
+        <h2 id="generation-title">Generation</h2>
+        <p>
+          {llmSetup
+            ? 'Manage the language model used to generate answers from retrieved context.'
+            : 'Set up a local language model before generated answers can run.'}
+        </p>
+      </div>
+
+      {llmSetup && !isEditingSetup ? (
+        <ConfiguredModelCard setup={llmSetup} onEdit={onEditSetup} />
+      ) : (
+        <>
+          <ProviderOptions
+            legend="Generation provider options"
+            name="generation-provider"
+            providers={llmProviders}
+            selectedProvider={selectedProvider}
+            onSelectProvider={onSelectProvider}
+          />
+
+          {ActiveProviderSetup && (
+            <ActiveProviderSetup
+              endpoint={OLLAMA_BASE_URL}
+              selectedModel={selectedModel}
+              onSelectModel={onSelectModel}
+            />
+          )}
+        </>
+      )}
+
+      <AdvancedOption
+        enabled={advancedOptionsEnabled}
+        label="Generation options"
+        summary="Tune context window, temperature, and response behavior."
+        onChange={onAdvancedOptionsChange}
+      />
+
+      <SaveSettingsButton
+        disabled={!selectedModel}
+        label={llmSetup ? 'Save changes' : 'Save setup'}
+        onClick={onSave}
+      />
+    </section>
+  );
+}
+
+function ProviderOptions({ legend, name, providers, selectedProvider, onSelectProvider }) {
+  return (
+    <fieldset className="model-options provider-options">
+      <legend className="sr-only">{legend}</legend>
+      {providers.map((provider) => {
+        const Icon = provider.icon;
+
+        return (
+          <label
+            className={`model-card provider-card${
+              selectedProvider === provider.id ? ' is-selected' : ''
+            }`}
+            key={provider.id}
+          >
+            <input
+              type="radio"
+              name={name}
+              checked={selectedProvider === provider.id}
+              onChange={() => onSelectProvider(provider.id)}
+            />
+            <span className="provider-icon" aria-hidden="true">
+              <Icon size={20} />
+            </span>
+            <span className="model-copy">
+              <span className="model-title-row">
+                <strong>{provider.name}</strong>
+                <em>Local</em>
+              </span>
+              <small>{provider.summary}</small>
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+function AdvancedOption({ enabled, label, summary, onChange }) {
+  return (
+    <label className={`advanced-option${enabled ? ' is-on' : ''}`}>
+      <span>
+        <strong>{label}</strong>
+        <small>{summary}</small>
+      </span>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={label}
+      />
+      <span className="toggle" aria-hidden="true" />
+    </label>
+  );
+}
+
+function SaveSettingsButton({ disabled, label, onClick }) {
+  return (
+    <button
+      className="save-button"
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Save size={18} />
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function PlaceholderSettingsPanel({ section }) {
+  return (
+    <section className="settings-detail" aria-labelledby="placeholder-settings-title">
+      <div className="settings-detail-heading">
+        <h2 id="placeholder-settings-title">{section?.label ?? 'Settings'}</h2>
+        <p>This settings section is ready for configuration controls.</p>
+      </div>
+    </section>
+  );
+}
+
 function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
+  return (
+    <OllamaModelSetup
+      endpoint={endpoint}
+      selectedModel={selectedModel}
+      onSelectModel={onSelectModel}
+      title="Available Ollama embedding models"
+      emptyMessage="No embedding-capable Ollama models were found."
+      installHint="Install one locally, for example: ollama pull nomic-embed-text"
+      radioName="ollama-embedding-model"
+      isSupportedModel={isEmbeddingModel}
+    />
+  );
+}
+
+function OllamaLlmSetup({ endpoint, selectedModel, onSelectModel }) {
+  return (
+    <OllamaModelSetup
+      endpoint={endpoint}
+      selectedModel={selectedModel}
+      onSelectModel={onSelectModel}
+      title="Available Ollama language models"
+      emptyMessage="No generation-capable Ollama models were found."
+      installHint="Install one locally, for example: ollama pull llama3.2"
+      radioName="ollama-llm-model"
+      isSupportedModel={isLlmModel}
+    />
+  );
+}
+
+function OllamaModelSetup({
+  endpoint,
+  selectedModel,
+  onSelectModel,
+  title,
+  emptyMessage,
+  installHint,
+  radioName,
+  isSupportedModel,
+}) {
   const [models, setModels] = useState([]);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
@@ -252,9 +486,9 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
           }
         }),
       );
-      const embeddingModels = modelsWithCapabilities.filter(isEmbeddingModel);
+      const supportedModels = modelsWithCapabilities.filter(isSupportedModel);
 
-      setModels(embeddingModels);
+      setModels(supportedModels);
       setStatus('ready');
     } catch (error) {
       setModels([]);
@@ -265,7 +499,7 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
           : 'Unable to connect to Ollama.',
       );
     }
-  }, [endpoint]);
+  }, [endpoint, isSupportedModel]);
 
   useEffect(() => {
     loadModels();
@@ -278,10 +512,10 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
   }, [models, onSelectModel, selectedModel]);
 
   return (
-    <section className="provider-setup" aria-label="Ollama embedding model setup">
+    <section className="provider-setup" aria-label={title}>
       <div className="provider-setup-header">
         <span>
-          <strong>Available Ollama embedding models</strong>
+          <strong>{title}</strong>
           <small>{endpoint}</small>
         </span>
         <button type="button" onClick={loadModels} disabled={status === 'loading'}>
@@ -304,8 +538,8 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
         <div className="setup-message">
           <AlertCircle size={18} />
           <span>
-            No embedding-capable Ollama models were found.
-            <small>Install one locally, for example: ollama pull nomic-embed-text</small>
+            {emptyMessage}
+            <small>{installHint}</small>
           </span>
         </div>
       )}
@@ -320,7 +554,7 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
             >
               <input
                 type="radio"
-                name="ollama-embedding-model"
+                name={radioName}
                 checked={selectedModel === model.name}
                 onChange={() => onSelectModel(model.name)}
               />
@@ -346,8 +580,16 @@ function OllamaEmbeddingSetup({ endpoint, selectedModel, onSelectModel }) {
 }
 
 function readSavedEmbeddingSetup() {
+  return readSavedSetup(EMBEDDING_SETUP_STORAGE_KEY);
+}
+
+function readSavedLlmSetup() {
+  return readSavedSetup(LLM_SETUP_STORAGE_KEY);
+}
+
+function readSavedSetup(storageKey) {
   try {
-    const savedSetup = window.localStorage.getItem(EMBEDDING_SETUP_STORAGE_KEY);
+    const savedSetup = window.localStorage.getItem(storageKey);
     return savedSetup ? JSON.parse(savedSetup) : null;
   } catch {
     return null;
@@ -360,6 +602,15 @@ function isEmbeddingModel(model) {
   const modelName = `${model.name ?? ''} ${model.model ?? ''}`.toLowerCase();
 
   return hasEmbeddingCapability || (capabilities.length === 0 && modelName.includes('embed'));
+}
+
+function isLlmModel(model) {
+  const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
+  const hasCompletionCapability = capabilities.includes('completion');
+  const modelName = `${model.name ?? ''} ${model.model ?? ''}`.toLowerCase();
+  const looksEmbeddingOnly = modelName.includes('embed');
+
+  return hasCompletionCapability || (capabilities.length === 0 && !looksEmbeddingOnly);
 }
 
 function formatModelSize(size) {
