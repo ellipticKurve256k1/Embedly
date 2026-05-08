@@ -4,6 +4,8 @@ import logoSrc from '../ref/embedly.png';
 import './index.css';
 import './App.css';
 import SettingsPage from './components/SettingsPage';
+import ModeTabs from './components/ModeTabs';
+import UploadBox from './components/UploadBox';
 
 const features = [
   {
@@ -28,9 +30,12 @@ export default function App() {
     window.location.hash === '#settings' ? 'settings' : 'search'
   ));
 
+  const [mode, setMode] = useState('search');
+
   useEffect(() => {
     const handleHashChange = () => {
       setPage(window.location.hash === '#settings' ? 'settings' : 'search');
+      setMode('search');
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -43,7 +48,7 @@ export default function App() {
 
   return (
     <main className="app">
-      <section className="landing-shell" aria-label="Embeddly search">
+      <section className="landing-shell" aria-label="Embeddly">
         <header className="topbar">
           <img className="brand-logo" src={logoSrc} alt="Embeddly" />
           <a className="icon-button" href="#settings" aria-label="Open settings">
@@ -51,33 +56,39 @@ export default function App() {
           </a>
         </header>
 
-        <div className="search-stage">
-          <div className="orbital-field" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+        <ModeTabs activeMode={mode} onModeChange={setMode} />
+
+        {mode === 'search' && (
+          <div className="search-stage">
+            <div className="orbital-field" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+
+            <label className="search-box">
+              <Search size={20} />
+              <input type="search" placeholder="Search your knowledge base..." />
+            </label>
           </div>
+        )}
 
-          <label className="search-box">
-            <Search size={20} />
-            <input type="search" placeholder="Search your knowledge base..." />
-          </label>
-        </div>
+        {mode === 'upload' && <UploadBox />}
 
-        <div className="feature-row" aria-label="Product highlights">
-          {features.map(({ title, subtitle, icon: Icon }) => (
-            <article className="feature-pill" key={title}>
-              <Icon size={20} />
-              <span>
-                <strong>{title}</strong>
-                <small>{subtitle}</small>
-              </span>
-            </article>
-          ))}
-        </div>
-
+        {mode === 'search' && (
+          <div className="feature-row" aria-label="Product highlights">
+            {features.map(({ title, subtitle, icon: Icon }) => (
+              <article className="feature-pill" key={title}>
+                <Icon size={20} />
+                <span>
+                  <strong>{title}</strong>
+                  <small>{subtitle}</small>
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
 }
-
