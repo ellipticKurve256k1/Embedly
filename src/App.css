@@ -1,0 +1,211 @@
+.search-stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  min-height: 0;
+  padding: clamp(60px, 12vh, 120px) 0;
+}
+
+.orbital-field {
+  position: absolute;
+  width: min(58vh, 62vw, 620px);
+  min-width: 280px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.74;
+  transform: translateY(0);
+  background:
+    radial-gradient(circle, transparent 0 23%, rgba(104, 88, 255, 0.09) 23.3% 23.8%, transparent 24.1%),
+    repeating-radial-gradient(circle, transparent 0 11px, rgba(117, 134, 255, 0.23) 12px 13px, transparent 14px 26px);
+  mask-image: radial-gradient(circle, transparent 0 22%, black 32% 67%, transparent 76%);
+}
+
+.orbital-field::before,
+.orbital-field::after,
+.orbital-field span {
+  content: "";
+  position: absolute;
+  inset: 13%;
+  border: 1px dotted rgba(99, 109, 255, 0.36);
+  border-radius: 42% 58% 47% 53%;
+}
+
+.orbital-field::before {
+  transform: rotate(22deg) scaleX(1.15);
+}
+
+.orbital-field::after {
+  transform: rotate(-31deg) scaleY(1.12);
+}
+
+.orbital-field span:nth-child(1) {
+  inset: 20%;
+  transform: rotate(67deg) scaleX(1.26);
+}
+
+.orbital-field span:nth-child(2) {
+  inset: 26%;
+  transform: rotate(-73deg) scaleY(1.2);
+}
+
+.orbital-field span:nth-child(3) {
+  inset: 8%;
+  transform: rotate(8deg) scaleY(0.78);
+}
+
+.search-box {
+  position: relative;
+  z-index: 2;
+  width: min(68vw, 760px);
+  min-width: min(100%, 360px);
+  min-height: clamp(64px, 8vh, 78px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 34px;
+  border: 1px solid rgba(126, 137, 170, 0.2);
+  border-radius: 999px;
+  color: #8c96ad;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 22px 42px rgba(72, 83, 138, 0.16),
+    0 8px 18px rgba(83, 95, 141, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.search-box svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+  flex: 0 0 auto;
+}
+
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #17213b;
+  background: transparent;
+  font: inherit;
+  font-size: clamp(17px, 2vw, 20px);
+  font-weight: 500;
+}
+
+.search-box input::placeholder {
+  color: #8f98ab;
+}
+
+.feature-row {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 22px);
+}
+
+.feature-pill {
+  min-width: 0;
+  min-height: clamp(58px, 7vh, 68px);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 16px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 16px;
+  color: #6258ff;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 14px 30px rgba(76, 88, 139, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.feature-pill svg {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.feature-pill span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.feature-pill strong,
+.feature-pill small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.feature-pill strong {
+  color: #665cff;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.feature-pill small {
+  color: #707a94;
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+@media (max-width: 680px) {
+  .search-stage {
+    padding: clamp(40px, 8vh, 80px) 0;
+  }
+
+  .orbital-field {
+    width: min(42vh, 82vw);
+    min-width: 220px;
+  }
+
+  .search-box {
+    width: 100%;
+    min-width: 0;
+    min-height: 60px;
+    gap: 14px;
+    padding: 0 20px;
+  }
+
+  .search-box svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .feature-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .feature-pill {
+    min-height: 48px;
+    padding: 8px 12px;
+  }
+
+  .feature-pill svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .feature-pill strong {
+    font-size: 12px;
+  }
+
+  .feature-pill small {
+    font-size: 9px;
+  }
+}

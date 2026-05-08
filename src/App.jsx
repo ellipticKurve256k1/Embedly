@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Search, Settings, Shield, Sparkles, Layers } from 'lucide-react';
 import logoSrc from '../ref/embedly.png';
 import './index.css';
+import './App.css';
 import SettingsPage from './components/SettingsPage';
 
 const features = [

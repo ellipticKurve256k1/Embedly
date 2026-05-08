@@ -14,6 +14,7 @@ import {
   Layers,
 } from 'lucide-react';
 import logoSrc from '../../ref/embedly.png';
+import './SettingsPage.css';
 
 const settingTabs = [
   { label: 'Embedding Model', icon: Zap, active: true },
