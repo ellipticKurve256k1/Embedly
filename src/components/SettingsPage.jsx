@@ -28,12 +28,12 @@ const OLLAMA_BASE_URL = 'http://localhost:11434';
 
 const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
-  { id: 'retrieval', label: 'Retrieval', icon: Search },
+  // { id: 'retrieval', label: 'Retrieval', icon: Search },
   { id: 'generation', label: 'Generation', icon: WandSparkles },
   { id: 'vector-db', label: 'VectorDB', icon: Database },
-  { id: 'data-sources', label: 'Data Sources', icon: Database },
-  { id: 'security', label: 'Security', icon: LockKeyhole },
-  { id: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
+  // { id: 'data-sources', label: 'Data Sources', icon: Database },
+  // { id: 'security', label: 'Security', icon: LockKeyhole },
+  // { id: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
   { id: 'about', label: 'About', icon: CircleHelp },
 ];
 
