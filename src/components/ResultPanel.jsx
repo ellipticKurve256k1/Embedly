@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { X, File, Copy, Check } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { X, FileText, Copy, Check } from 'lucide-react';
 import './ResultPanel.css';
 
 function formatScore(score) {
@@ -8,11 +8,14 @@ function formatScore(score) {
 }
 
 export default function ResultPanel({ result, onClose }) {
+  const [copied, setCopied] = useState(false);
+
   const handleCopy = useCallback(async () => {
     if (!result?.content) return;
-
     try {
       await navigator.clipboard.writeText(result.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
     }
@@ -26,7 +29,7 @@ export default function ResultPanel({ result, onClose }) {
     <aside className="result-panel">
       <header className="result-panel-header">
         <span className="result-panel-title">
-          <File size={16} />
+          <FileText size={15} />
           <strong>{result.documentName || 'Unknown document'}</strong>
         </span>
         <button
@@ -35,7 +38,7 @@ export default function ResultPanel({ result, onClose }) {
           aria-label="Close panel"
           onClick={onClose}
         >
-          <X size={16} />
+          <X size={15} />
         </button>
       </header>
 
@@ -58,12 +61,21 @@ export default function ResultPanel({ result, onClose }) {
 
       <footer className="result-panel-actions">
         <button
-          className="result-action-button"
+          className={`result-action-button${copied ? ' is-copied' : ''}`}
           type="button"
           onClick={handleCopy}
         >
-          <Copy size={14} />
-          <span>Copy chunk</span>
+          {copied ? (
+            <>
+              <Check size={14} />
+              <span>Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy size={14} />
+              <span>Copy chunk</span>
+            </>
+          )}
         </button>
       </footer>
     </aside>

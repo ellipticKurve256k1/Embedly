@@ -1,67 +1,61 @@
-import { useMemo, useCallback } from 'react';
-import { File } from 'lucide-react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import './OntologyMap.css';
 
 function getScoreColor(score) {
   if (score >= 0.85) return '#2f7b5f';
   if (score >= 0.7) return '#6258ff';
-  if (score >= 0.5) return '#8c7a4a';
+  if (score >= 0.5) return '#9d8b52';
   return '#8c96ad';
 }
 
-function getScoreOpacity(score) {
-  if (score >= 0.85) return 1;
-  if (score >= 0.7) return 0.88;
-  if (score >= 0.5) return 0.76;
-  return 0.64;
+function getScoreLabel(score) {
+  if (score >= 0.85) return 'High';
+  if (score >= 0.7) return 'Good';
+  if (score >= 0.5) return 'Fair';
+  return 'Low';
 }
 
-function truncateText(text, maxLength = 20) {
+function truncateText(text, maxLength = 24) {
   if (!text) return '';
   if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength)}...`;
+  return `${text.slice(0, maxLength - 1)}…`;
 }
 
+const SVG_WIDTH = 720;
+const SVG_HEIGHT = 440;
+
 export default function OntologyMap({ query, results, selectedId, onSelectNode }) {
-  const viewBox = useMemo(() => {
-    if (typeof window === 'undefined') return '0 0 600 400';
-    const width = Math.min(600, window.innerWidth - 48);
-    const height = Math.min(400, window.innerHeight - 280);
-    return `0 0 ${width} ${height}`;
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsReady(true), 50);
+    return () => clearTimeout(timer);
   }, []);
 
   const positionedResults = useMemo(() => {
     if (!results || results.length === 0) return [];
 
-    const width = typeof window !== 'undefined' ? Math.min(600, window.innerWidth - 48) : 600;
-    const height = typeof window !== 'undefined' ? Math.min(400, window.innerHeight - 280) : 400;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const minRadius = 70;
-    const maxRadius = Math.min(width, height) / 2 - 50;
+    const cx = SVG_WIDTH / 2;
+    const cy = SVG_HEIGHT / 2;
+    const minRadius = 90;
+    const maxRadius = 170;
 
     return results.map((result, index) => {
       const angle = (index / results.length) * 2 * Math.PI - Math.PI / 2;
-      const normalizedScore = result.score;
-      const distance = minRadius + (1 - normalizedScore) * (maxRadius - minRadius) * 0.7;
-
-      const x = centerX + Math.cos(angle) * distance;
-      const y = centerY + Math.sin(angle) * distance;
+      const distance = minRadius + (1 - result.score) * (maxRadius - minRadius);
 
       return {
         ...result,
-        x,
-        y,
-        color: getScoreColor(normalizedScore),
-        opacity: getScoreOpacity(normalizedScore),
+        x: cx + Math.cos(angle) * distance,
+        y: cy + Math.sin(angle) * distance,
+        cx,
+        cy,
+        color: getScoreColor(result.score),
+        label: getScoreLabel(result.score),
+        delay: index * 80,
       };
     });
   }, [results]);
-
-  const width = typeof window !== 'undefined' ? Math.min(600, window.innerWidth - 48) : 600;
-  const height = typeof window !== 'undefined' ? Math.min(400, window.innerHeight - 280) : 400;
-  const centerX = width / 2;
-  const centerY = height / 2;
 
   const handleNodeClick = useCallback((result) => {
     onSelectNode(result);
@@ -73,119 +67,168 @@ export default function OntologyMap({ query, results, selectedId, onSelectNode }
 
   return (
     <div className="ontology-map">
-      <svg viewBox={viewBox} className="ontology-svg">
+      <div className="ontology-map-header">
+        <strong>Results from {results.length} chunks</strong>
+        {query && (
+          <span className="ontology-query-subtitle">
+            Query: <em>{truncateText(query, 40)}</em>
+          </span>
+        )}
+      </div>
+
+      <svg
+        viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+        className="ontology-svg"
+        preserveAspectRatio="xMidYMid meet"
+      >
         <defs>
-          <filter id="ontology-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-          <linearGradient id="query-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7368ff" />
-            <stop offset="100%" stopColor="#5144f1" />
+          <radialGradient id="queryGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#7368ff" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#7368ff" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="queryFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#7b70ff" />
+            <stop offset="100%" stopColor="#5748e8" />
           </linearGradient>
+          <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#4c58b8" floodOpacity="0.14" />
+          </filter>
         </defs>
 
-        {positionedResults.map((result) => (
+        {/* Subtle background circles */}
+        <circle cx={SVG_WIDTH / 2} cy={SVG_HEIGHT / 2} r={180} fill="none" stroke="rgba(132,146,184,0.08)" strokeWidth="1" />
+        <circle cx={SVG_WIDTH / 2} cy={SVG_HEIGHT / 2} r={120} fill="none" stroke="rgba(132,146,184,0.06)" strokeWidth="1" />
+
+        {/* Edges */}
+        {positionedResults.map((r) => (
           <line
-            key={`edge-${result.chunkId}`}
-            className="ontology-edge"
-            x1={centerX}
-            y1={centerY}
-            x2={result.x}
-            y2={result.y}
-            stroke={result.color}
-            strokeOpacity={result.opacity * 0.4}
+            key={`edge-${r.chunkId}`}
+            className={`ontology-edge${isReady ? ' is-visible' : ''}`}
+            style={{ transitionDelay: `${r.delay + 100}ms` }}
+            x1={r.cx}
+            y1={r.cy}
+            x2={r.x}
+            y2={r.y}
+            stroke={r.color}
+            strokeOpacity={0.22}
           />
         ))}
 
-        <g className="ontology-query-node">
-          <circle
-            cx={centerX}
-            cy={centerY}
-            r={28}
-            fill="url(#query-gradient)"
-            filter="url(#ontology-glow)"
-          />
-          <text
-            x={centerX}
-            y={centerY}
-            className="ontology-query-label"
-            textAnchor="middle"
-            dominantBaseline="middle"
-          >
-            {truncateText(query, 12) || 'Query'}
-          </text>
-        </g>
-
-        {positionedResults.map((result) => {
-          const isSelected = selectedId === result.chunkId;
-
+        {/* Result nodes */}
+        {positionedResults.map((r) => {
+          const isSelected = selectedId === r.chunkId;
           return (
             <g
-              key={`node-${result.chunkId}`}
-              className={`ontology-result-node${isSelected ? ' is-selected' : ''}`}
-              onClick={() => handleNodeClick(result)}
-              style={{ cursor: 'pointer' }}
+              key={`node-${r.chunkId}`}
+              className={`ontology-result${isReady ? ' is-visible' : ''}${isSelected ? ' is-selected' : ''}`}
+              style={{ transitionDelay: `${r.delay}ms` }}
+              onClick={() => handleNodeClick(r)}
             >
-              {isSelected && (
-                <circle
-                  cx={result.x}
-                  cy={result.y}
-                  r={30}
-                  fill="none"
-                  stroke={result.color}
-                  strokeWidth={2}
-                  strokeOpacity={0.6}
-                  className="ontology-selection-ring"
-                />
-              )}
+              {/* Selection ring */}
               <circle
-                cx={result.x}
-                cy={result.y}
-                r={22}
-                fill={result.color}
-                fillOpacity={result.opacity}
-                className="ontology-node-circle"
+                className="ontology-node-ring"
+                cx={r.x}
+                cy={r.y}
+                r={34}
+                fill="none"
+                stroke={r.color}
+                strokeWidth={isSelected ? 2 : 1.5}
+                strokeOpacity={isSelected ? 0.5 : 0}
               />
+
+              {/* Outer soft glow */}
+              <circle
+                cx={r.x}
+                cy={r.y}
+                r={26}
+                fill={r.color}
+                fillOpacity={0.06}
+                className="ontology-node-glow"
+              />
+
+              {/* Main node */}
+              <circle
+                className="ontology-node-circle"
+                cx={r.x}
+                cy={r.y}
+                r={22}
+                fill={r.color}
+                fillOpacity={0.14}
+                stroke={r.color}
+                strokeWidth={2}
+                strokeOpacity={0.85}
+                filter="url(#softShadow)"
+              />
+
+              {/* Inner dot */}
+              <circle
+                cx={r.x}
+                cy={r.y}
+                r={6}
+                fill={r.color}
+                fillOpacity={0.9}
+              />
+
+              {/* Document name label */}
               <text
-                x={result.x}
-                y={result.y - 28}
-                className="ontology-node-label"
+                x={r.x}
+                y={r.y - 40}
+                className="ontology-label"
                 textAnchor="middle"
               >
-                {truncateText(result.documentName?.replace(/\.[^.]+$/, ''), 16)}
+                {truncateText(r.documentName?.replace(/\.[^.]+$/, ''), 20)}
               </text>
+
+              {/* Score label */}
               <text
-                x={result.x}
-                y={result.y}
-                className="ontology-node-score"
+                x={r.x}
+                y={r.y + 48}
+                className="ontology-score-label"
                 textAnchor="middle"
-                dominantBaseline="middle"
               >
-                {Math.round(result.score * 100)}
+                {Math.round(r.score * 100)}%
+              </text>
+
+              {/* Match quality label */}
+              <text
+                x={r.x}
+                y={r.y + 62}
+                className="ontology-match-label"
+                textAnchor="middle"
+              >
+                {r.label} match
               </text>
             </g>
           );
         })}
-      </svg>
 
-      <div className="ontology-legend">
-        <div className="ontology-legend-item">
-          <span className="ontology-legend-dot" style={{ background: '#2f7b5f' }} />
-          <span>High match</span>
-        </div>
-        <div className="ontology-legend-item">
-          <span className="ontology-legend-dot" style={{ background: '#6258ff' }} />
-          <span>Good match</span>
-        </div>
-        <div className="ontology-legend-item">
-          <span className="ontology-legend-dot" style={{ background: '#8c96ad' }} />
-          <span>Low match</span>
-        </div>
-      </div>
+        {/* Query center node */}
+        <g className={`ontology-query${isReady ? ' is-visible' : ''}`}>
+          <circle
+            cx={SVG_WIDTH / 2}
+            cy={SVG_HEIGHT / 2}
+            r={72}
+            fill="url(#queryGlow)"
+            opacity={0.7}
+          />
+          <circle
+            cx={SVG_WIDTH / 2}
+            cy={SVG_HEIGHT / 2}
+            r={28}
+            fill="url(#queryFill)"
+            filter="url(#softShadow)"
+          />
+          <text
+            x={SVG_WIDTH / 2}
+            y={SVG_HEIGHT / 2 - 2}
+            className="ontology-query-text"
+            textAnchor="middle"
+            dominantBaseline="central"
+          >
+            {truncateText(query, 10).toUpperCase() || 'QUERY'}
+          </text>
+        </g>
+      </svg>
     </div>
   );
 }

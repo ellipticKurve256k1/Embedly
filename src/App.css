@@ -1,18 +1,18 @@
 .search-stage {
   position: relative;
   z-index: 1;
-  display: grid;
-  align-items: start;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-height: 0;
   padding: clamp(24px, 4vh, 48px) 0;
+  transition: padding 300ms ease;
 }
 
 .search-stage.has-results {
-  grid-template-rows: auto 1fr;
-  justify-items: stretch;
+  align-items: stretch;
+  padding: clamp(16px, 2.5vh, 28px) 0 0;
   gap: clamp(16px, 2vh, 24px);
-  padding: clamp(12px, 2vh, 20px) 0;
 }
 
 .orbital-field {
@@ -62,6 +62,7 @@
   transform: rotate(8deg) scaleY(0.78);
 }
 
+/* Search Box — consistent width always */
 .search-box {
   position: relative;
   z-index: 2;
@@ -80,17 +81,27 @@
     0 22px 42px rgba(72, 83, 138, 0.16),
     0 8px 18px rgba(83, 95, 141, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition:
+    box-shadow 300ms ease,
+    border-color 200ms ease,
+    transform 200ms ease;
+}
+
+.search-box:focus-within {
+  border-color: rgba(98, 88, 255, 0.42);
+  box-shadow:
+    0 24px 48px rgba(72, 83, 138, 0.2),
+    0 10px 24px rgba(91, 82, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
 }
 
 .has-results .search-box {
-  width: min(50vw, 520px);
-  min-height: 56px;
-  gap: 14px;
-  padding: 0 24px;
+  min-height: 60px;
+  align-self: center;
   box-shadow:
-    0 12px 28px rgba(72, 83, 138, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.94);
+    0 14px 32px rgba(72, 83, 138, 0.12),
+    0 6px 14px rgba(83, 95, 141, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 .search-box svg {
@@ -105,8 +116,8 @@
 }
 
 .has-results .search-box svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .search-box input {
@@ -119,10 +130,6 @@
   font: inherit;
   font-size: clamp(17px, 2vw, 20px);
   font-weight: 500;
-}
-
-.has-results .search-box input {
-  font-size: clamp(15px, 1.5vw, 17px);
 }
 
 .search-box input::placeholder {
@@ -145,7 +152,7 @@
   width: min(68vw, 760px);
   min-width: min(100%, 360px);
   padding: 12px 18px;
-  border: 1px solid rgba(210, 83, 100, 0.24);
+  border: 1px solid rgba(210, 83, 100, 0.18);
   border-radius: 12px;
   color: #9f4452;
   background: rgba(255, 246, 248, 0.88);
@@ -153,14 +160,27 @@
   font-weight: 600;
   line-height: 1.4;
   text-align: center;
+  animation: fade-in 200ms ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ontology-container {
   display: flex;
-  gap: clamp(16px, 2vw, 28px);
+  gap: clamp(20px, 2.5vw, 32px);
   width: 100%;
   min-height: 0;
   padding: 0 clamp(20px, 3vw, 40px);
+  animation: fade-in 350ms ease 120ms both;
 }
 
 .ontology-map-wrapper {
@@ -175,6 +195,7 @@
   gap: 16px;
   padding: clamp(40px, 8vh, 80px) clamp(20px, 3vw, 40px);
   text-align: center;
+  animation: fade-in 250ms ease;
 }
 
 .search-empty p {
@@ -185,20 +206,24 @@
 }
 
 .search-empty button {
-  padding: 8px 20px;
-  border: 1px solid rgba(132, 146, 184, 0.24);
+  padding: 8px 22px;
+  border: 1px solid rgba(132, 146, 184, 0.2);
   border-radius: 999px;
   color: #6258ff;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.86);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 160ms ease, box-shadow 160ms ease;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
 }
 
 .search-empty button:hover {
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 8px 20px rgba(76, 88, 139, 0.12);
+  border-color: rgba(98, 88, 255, 0.3);
+  color: #574cff;
+  background: rgba(255, 255, 255, 0.98);
 }
 
 @media (max-width: 680px) {
@@ -207,7 +232,7 @@
   }
 
   .search-stage.has-results {
-    padding: 12px 0;
+    padding: 12px 0 0;
     gap: 12px;
   }
 
@@ -217,7 +242,7 @@
   }
 
   .search-box {
-    width: 100%;
+    width: calc(100% - 24px);
     min-width: 0;
     min-height: 60px;
     gap: 14px;
@@ -225,8 +250,8 @@
   }
 
   .has-results .search-box {
-    width: 100%;
-    min-height: 52px;
+    width: calc(100% - 24px);
+    min-height: 54px;
   }
 
   .search-box svg {
@@ -234,9 +259,9 @@
     height: 24px;
   }
 
-  .has-results .search-box svg {
-    width: 20px;
-    height: 20px;
+  .search-error {
+    width: calc(100% - 24px);
+    min-width: 0;
   }
 
   .ontology-container {
