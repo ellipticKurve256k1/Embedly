@@ -424,5 +424,5 @@ Wire the search input to `api.searchQuery()` to display results.
 
 - Ollama runs on `http://localhost:11434` (separate from Express on 3001)
 - Frontend stays on Vite port 5173, calls Express on 3001
-- SQLite DB file: `server/embeddly.db`
+- SQLite DB file: `server/embedly.db`
 - All timestamps in ISO format (`new Date().toISOString()`)

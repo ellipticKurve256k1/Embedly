@@ -153,6 +153,27 @@
   font-weight: 600;
 }
 
+.file-status {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #65718b;
+  background: rgba(147, 157, 183, 0.14);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.file-status.is-completed {
+  color: #2f7b5f;
+  background: rgba(47, 123, 95, 0.12);
+}
+
+.file-status.is-failed {
+  color: #9f4452;
+  background: rgba(210, 83, 100, 0.12);
+}
+
 .file-remove {
   width: 32px;
   height: 32px;
@@ -199,6 +220,13 @@
 .file-embed:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 22px rgba(78, 65, 240, 0.32);
+}
+
+.file-embed:disabled,
+.embed-all-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+  transform: none;
 }
 
 .file-embed svg {
@@ -251,6 +279,25 @@
   stroke-width: 2;
 }
 
+.upload-message {
+  width: min(68vw, 560px);
+  min-width: min(100%, 300px);
+  padding: 12px 14px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 12px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.upload-message.is-error {
+  border-color: rgba(210, 83, 100, 0.22);
+  color: #9f4452;
+  background: rgba(255, 246, 248, 0.82);
+}
+
 @media (max-width: 680px) {
   .upload-box {
     width: 100%;
@@ -290,6 +337,12 @@
     display: none;
   }
 
+  .file-status {
+    max-width: 74px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .file-embed span {
     display: none;
   }
@@ -303,5 +356,10 @@
     min-width: 0;
     min-height: 48px;
     font-size: 14px;
+  }
+
+  .upload-message {
+    width: 100%;
+    min-width: 0;
   }
 }

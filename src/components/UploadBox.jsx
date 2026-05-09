@@ -1,5 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { UploadCloud, File, X, Sparkles } from 'lucide-react';
+import {
+  deleteDocument,
+  getDocuments,
+  startEmbedding,
+  uploadFiles,
+} from '../lib/api.js';
 import './UploadBox.css';
 
 const ACCEPTED_TYPES = {
@@ -27,18 +33,33 @@ function formatSize(bytes) {
 }
 
 export default function UploadBox() {
-  const [files, setFiles] = useState([]);
+  const [documents, setDocuments] = useState([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [embeddingDocumentIds, setEmbeddingDocumentIds] = useState(() => new Set());
+  const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
 
-  const handleFiles = useCallback((incoming) => {
+  const refreshDocuments = useCallback(async () => {
+    const payload = await getDocuments();
+    setDocuments(payload.documents ?? []);
+  }, []);
+
+  useEffect(() => {
+    refreshDocuments().catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load documents.');
+    });
+  }, [refreshDocuments]);
+
+  const handleFiles = useCallback(async (incoming) => {
     const accepted = [];
     const rejected = [];
+    const existingNames = new Set(documents.map((document) => document.filename));
 
     Array.from(incoming).forEach((file) => {
-      if (isAcceptedFile(file)) {
+      if (isAcceptedFile(file) && !existingNames.has(file.name)) {
         accepted.push(file);
-      } else {
+      } else if (!isAcceptedFile(file)) {
         rejected.push(file.name);
       }
     });
@@ -48,12 +69,25 @@ export default function UploadBox() {
       alert(`Skipped unsupported files:\n${rejected.join('\n')}`);
     }
 
-    setFiles((prev) => {
-      const names = new Set(prev.map((f) => f.name));
-      const unique = accepted.filter((f) => !names.has(f.name));
-      return [...prev, ...unique];
-    });
-  }, []);
+    if (accepted.length === 0) {
+      return;
+    }
+
+    setIsUploading(true);
+    setErrorMessage('');
+
+    try {
+      const payload = await uploadFiles(accepted);
+      setDocuments((currentDocuments) => [
+        ...(payload.documents ?? []),
+        ...currentDocuments,
+      ]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Upload failed.');
+    } finally {
+      setIsUploading(false);
+    }
+  }, [documents]);
 
   const onDragOver = useCallback((e) => {
     e.preventDefault();
@@ -90,21 +124,56 @@ export default function UploadBox() {
     []
   );
 
-  const removeFile = useCallback((name) => {
-    setFiles((prev) => prev.filter((f) => f.name !== name));
+  const removeDocument = useCallback(async (document) => {
+    setErrorMessage('');
+
+    try {
+      await deleteDocument(document.id);
+      setDocuments((currentDocuments) => (
+        currentDocuments.filter((currentDocument) => currentDocument.id !== document.id)
+      ));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Delete failed.');
+    }
   }, []);
 
-  const embedFile = useCallback((file) => {
-    // eslint-disable-next-line no-console
-    console.log('Embedding:', file.name);
-    // Replace with actual embedding logic when connected to backend
-  }, []);
+  const embedDocument = useCallback(async (document) => {
+    setEmbeddingDocumentIds((currentIds) => new Set(currentIds).add(document.id));
+    setErrorMessage('');
 
-  const embedAllFiles = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.log('Embedding all files:', files.map((f) => f.name));
-    // Replace with actual batch embedding logic when connected to backend
-  }, [files]);
+    try {
+      await startEmbedding([document.id]);
+      await refreshDocuments();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Embedding failed.');
+    } finally {
+      setEmbeddingDocumentIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(document.id);
+        return nextIds;
+      });
+    }
+  }, [refreshDocuments]);
+
+  const embedAllDocuments = useCallback(async () => {
+    const documentIds = documents.map((document) => document.id);
+
+    if (documentIds.length === 0) {
+      return;
+    }
+
+    setEmbeddingDocumentIds(new Set(documentIds));
+    setErrorMessage('');
+
+    try {
+      await startEmbedding(documentIds);
+      await refreshDocuments();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Embedding failed.');
+    } finally {
+      setEmbeddingDocumentIds(new Set());
+    }
+  }, [documents, refreshDocuments]);
 
   return (
     <div className="upload-stage">
@@ -132,53 +201,70 @@ export default function UploadBox() {
         />
 
         <UploadCloud size={44} />
-        <div className="upload-label">Drop files here or click to upload</div>
+        <div className="upload-label">
+          {isUploading ? 'Uploading files...' : 'Drop files here or click to upload'}
+        </div>
         <p className="upload-hint">Accepted: PDF, TXT, MD, CSV</p>
       </div>
 
-      {files.length > 0 && (
-        <ul className="file-list" aria-label="Selected files">
-          {files.map((file) => (
-            <li className="file-item" key={file.name}>
+      {errorMessage && (
+        <div className="upload-message is-error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      {documents.length > 0 && (
+        <ul className="file-list" aria-label="Uploaded documents">
+          {documents.map((document) => {
+            const isEmbedding = embeddingDocumentIds.has(document.id);
+
+            return (
+            <li className="file-item" key={document.id}>
               <File className="file-icon" size={18} />
-              <span className="file-name">{file.name}</span>
-              <span className="file-size">{formatSize(file.size)}</span>
+              <span className="file-name">{document.filename}</span>
+              <span className={`file-status is-${document.status}`}>{document.status}</span>
+              <span className="file-size">{formatSize(document.sizeBytes ?? 0)}</span>
               <button
                 className="file-embed"
                 type="button"
-                aria-label={`Proceed embedding ${file.name}`}
+                disabled={isEmbedding}
+                aria-label={`Proceed embedding ${document.filename}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  embedFile(file);
+                  embedDocument(document);
                 }}
               >
                 <Sparkles size={14} />
-                <span>Embed</span>
+                <span>{isEmbedding ? 'Embedding' : 'Embed'}</span>
               </button>
               <button
                 className="file-remove"
                 type="button"
-                aria-label={`Remove ${file.name}`}
+                aria-label={`Remove ${document.filename}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  removeFile(file.name);
+                  removeDocument(document);
                 }}
               >
                 <X size={16} />
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
-      {files.length > 0 && (
+      {documents.length > 0 && (
         <button
           className="embed-all-button"
           type="button"
-          onClick={embedAllFiles}
+          disabled={embeddingDocumentIds.size > 0}
+          onClick={embedAllDocuments}
         >
           <Sparkles size={18} />
-          <span>Proceed all files embedding</span>
+          <span>
+            {embeddingDocumentIds.size > 0 ? 'Embedding files...' : 'Proceed all files embedding'}
+          </span>
         </button>
       )}
     </div>

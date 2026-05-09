@@ -422,6 +422,70 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
+.settings-field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-field {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 220px);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 26px rgba(76, 88, 139, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.settings-field > span {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.settings-field strong {
+  color: #24304b;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.settings-field small,
+.settings-field em {
+  color: #6f7a94;
+  font-size: 12px;
+  line-height: 1.35;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.settings-field select,
+.settings-field input {
+  min-width: 0;
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 10px;
+  color: #24304b;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.settings-field select,
+.settings-field input[type="number"] {
+  padding: 0 12px;
+}
+
+.settings-field input[type="range"] {
+  min-height: 24px;
+}
+
 .advanced-option span:first-child {
   min-width: 0;
   display: grid;
@@ -604,6 +668,11 @@
   .advanced-option {
     min-height: 70px;
     padding: 14px 16px;
+  }
+
+  .settings-field {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .save-button {

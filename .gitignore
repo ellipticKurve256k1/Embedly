@@ -5,3 +5,7 @@ Agents.md
 package-lock.json
 dist
 TODO.md
+server/uploads/
+server/*.db
+server/*.db-shm
+server/*.db-wal

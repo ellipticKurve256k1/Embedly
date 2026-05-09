@@ -15,10 +15,12 @@ import {
 } from 'lucide-react';
 import logoSrc from '../../ref/embedly.png';
 import {
+  CHUNKING_CONFIG_STORAGE_KEY,
   EMBEDDING_SETUP_STORAGE_KEY,
   LLM_SETUP_STORAGE_KEY,
   VECTOR_DB_SETUP_STORAGE_KEY,
   readSavedEmbeddingSetup,
+  readSavedChunkingConfig,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
 } from '../lib/storage.js';
@@ -28,7 +30,7 @@ const OLLAMA_BASE_URL = 'http://localhost:11434';
 
 const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
-  // { id: 'retrieval', label: 'Retrieval', icon: Search },
+  { id: 'retrieval', label: 'Retrieval', icon: Search },
   { id: 'generation', label: 'Generation', icon: WandSparkles },
   { id: 'vector-db', label: 'VectorDB', icon: Database },
   // { id: 'data-sources', label: 'Data Sources', icon: Database },
@@ -85,6 +87,7 @@ export default function SettingsPage() {
   const [selectedVectorDbProvider, setSelectedVectorDbProvider] = useState(
     vectorDbSetup?.provider ?? vectorDbProviders[0].id,
   );
+  const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const activeProvider = embeddingProviders.find((provider) => provider.id === selectedProvider);
   const ActiveProviderSetup = activeProvider?.component;
@@ -142,6 +145,12 @@ export default function SettingsPage() {
     window.localStorage.setItem(VECTOR_DB_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
     setVectorDbSetup(nextSetup);
     setSelectedVectorDbProvider(providerId);
+  };
+
+  const handleSaveChunkingConfig = () => {
+    const nextConfig = normalizeChunkingConfig(chunkingConfig);
+    window.localStorage.setItem(CHUNKING_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig));
+    setChunkingConfig(nextConfig);
   };
 
   return (
@@ -215,6 +224,14 @@ export default function SettingsPage() {
               />
             )}
 
+            {activeSection === 'retrieval' && (
+              <RetrievalSettingsPanel
+                chunkingConfig={chunkingConfig}
+                onChange={setChunkingConfig}
+                onSave={handleSaveChunkingConfig}
+              />
+            )}
+
             {activeSection === 'vector-db' && (
               <VectorDbSettingsPanel
                 selectedProvider={selectedVectorDbProvider}
@@ -225,6 +242,7 @@ export default function SettingsPage() {
 
             {activeSection !== 'embedding'
               && activeSection !== 'generation'
+              && activeSection !== 'retrieval'
               && activeSection !== 'vector-db' && (
               <PlaceholderSettingsPanel section={settingTabs.find((tab) => tab.id === activeSection)} />
             )}
@@ -232,6 +250,101 @@ export default function SettingsPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function normalizeChunkingConfig(config) {
+  return {
+    strategy: config.strategy === 'fixed' ? 'fixed' : 'paragraph',
+    maxChunkSize: Math.max(100, Number(config.maxChunkSize) || 1000),
+    minChunkSize: Math.max(1, Number(config.minChunkSize) || 50),
+    overlap: Math.max(0, Number(config.overlap) || 0),
+  };
+}
+
+function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
+  const updateConfig = (field, value) => {
+    onChange((currentConfig) => ({
+      ...currentConfig,
+      [field]: value,
+    }));
+  };
+
+  return (
+    <section className="settings-detail" aria-labelledby="retrieval-title">
+      <div className="settings-detail-heading">
+        <h2 id="retrieval-title">Retrieval</h2>
+        <p>Configure how uploaded documents are split before embedding and indexing.</p>
+      </div>
+
+      <div className="settings-field-grid">
+        <label className="settings-field">
+          <span>
+            <strong>Split strategy</strong>
+            <small>Paragraph preserves semantic boundaries. Fixed uses character windows.</small>
+          </span>
+          <select
+            value={chunkingConfig.strategy}
+            onChange={(event) => updateConfig('strategy', event.target.value)}
+          >
+            <option value="paragraph">Paragraph</option>
+            <option value="fixed">Fixed</option>
+          </select>
+        </label>
+
+        {chunkingConfig.strategy === 'fixed' && (
+          <label className="settings-field">
+            <span>
+              <strong>Max chunk size</strong>
+              <small>Maximum characters per fixed chunk.</small>
+            </span>
+            <input
+              min="100"
+              step="50"
+              type="number"
+              value={chunkingConfig.maxChunkSize}
+              onChange={(event) => updateConfig('maxChunkSize', Number(event.target.value))}
+            />
+          </label>
+        )}
+
+        <label className="settings-field">
+          <span>
+            <strong>Min chunk size</strong>
+            <small>Discard chunks shorter than this many characters.</small>
+          </span>
+          <input
+            min="1"
+            step="10"
+            type="number"
+            value={chunkingConfig.minChunkSize}
+            onChange={(event) => updateConfig('minChunkSize', Number(event.target.value))}
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>
+            <strong>Overlap</strong>
+            <small>Characters repeated between adjacent fixed chunks.</small>
+          </span>
+          <input
+            min="0"
+            max="500"
+            step="10"
+            type="range"
+            value={chunkingConfig.overlap}
+            onChange={(event) => updateConfig('overlap', Number(event.target.value))}
+          />
+          <em>{chunkingConfig.overlap} characters</em>
+        </label>
+      </div>
+
+      <SaveSettingsButton
+        disabled={false}
+        label="Save retrieval settings"
+        onClick={onSave}
+      />
+    </section>
   );
 }
 
