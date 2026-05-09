@@ -13,8 +13,7 @@ import SettingsPage from './components/SettingsPage';
 import ModeTabs from './components/ModeTabs';
 import UploadBox from './components/UploadBox';
 import ModelStatusBar from './components/ModelStatusBar';
-import OntologyMap from './components/OntologyMap';
-import ResultPanel from './components/ResultPanel';
+import SearchResults from './components/SearchResults';
 
 export default function App() {
   const [page, setPage] = useState(() => (
@@ -70,7 +69,7 @@ export default function App() {
     }
   }, [query, handleSearch]);
 
-  const handleSelectNode = useCallback((result) => {
+  const handleSelectResult = useCallback((result) => {
     setSelectedResult(result);
   }, []);
 
@@ -142,22 +141,13 @@ export default function App() {
             )}
 
             {hasResults && (
-              <div className="ontology-container">
-                <div className="ontology-map-wrapper">
-                  <OntologyMap
-                    query={query}
-                    results={searchResults}
-                    selectedId={selectedResult?.chunkId}
-                    onSelectNode={handleSelectNode}
-                  />
-                </div>
-                {selectedResult && (
-                  <ResultPanel
-                    result={selectedResult}
-                    onClose={handleClosePanel}
-                  />
-                )}
-              </div>
+              <SearchResults
+                query={query}
+                results={searchResults}
+                selectedResult={selectedResult}
+                onSelectResult={handleSelectResult}
+                onClosePreview={handleClosePanel}
+              />
             )}
 
             {searchResults && searchResults.length === 0 && !isSearching && (
