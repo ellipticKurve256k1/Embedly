@@ -130,6 +130,13 @@ input {
   stroke-width: 2;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

@@ -14,11 +14,15 @@ import {
   Zap,
 } from 'lucide-react';
 import logoSrc from '../../ref/embedly.png';
+import {
+  EMBEDDING_SETUP_STORAGE_KEY,
+  LLM_SETUP_STORAGE_KEY,
+  readSavedEmbeddingSetup,
+  readSavedLlmSetup,
+} from '../lib/storage.js';
 import './SettingsPage.css';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
-const EMBEDDING_SETUP_STORAGE_KEY = 'embeddly.embeddingSetup';
-const LLM_SETUP_STORAGE_KEY = 'embeddly.llmSetup';
 
 const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
@@ -577,23 +581,6 @@ function OllamaModelSetup({
       )}
     </section>
   );
-}
-
-function readSavedEmbeddingSetup() {
-  return readSavedSetup(EMBEDDING_SETUP_STORAGE_KEY);
-}
-
-function readSavedLlmSetup() {
-  return readSavedSetup(LLM_SETUP_STORAGE_KEY);
-}
-
-function readSavedSetup(storageKey) {
-  try {
-    const savedSetup = window.localStorage.getItem(storageKey);
-    return savedSetup ? JSON.parse(savedSetup) : null;
-  } catch {
-    return null;
-  }
 }
 
 function isEmbeddingModel(model) {
