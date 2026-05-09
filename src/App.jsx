@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Search, Settings } from 'lucide-react';
 import logoSrc from '../ref/embedly.png';
-import { readSavedEmbeddingSetup, readSavedLlmSetup } from './lib/storage.js';
+import {
+  readSavedEmbeddingSetup,
+  readSavedLlmSetup,
+  readSavedVectorDbSetup,
+} from './lib/storage.js';
 import './index.css';
 import './App.css';
 import SettingsPage from './components/SettingsPage';
@@ -17,6 +21,7 @@ export default function App() {
   const [mode, setMode] = useState('search');
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
   const [llmSetup, setLlmSetup] = useState(() => readSavedLlmSetup());
+  const [vectorDbSetup, setVectorDbSetup] = useState(() => readSavedVectorDbSetup());
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -24,6 +29,7 @@ export default function App() {
       setMode('search');
       setEmbeddingSetup(readSavedEmbeddingSetup());
       setLlmSetup(readSavedLlmSetup());
+      setVectorDbSetup(readSavedVectorDbSetup());
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -40,7 +46,11 @@ export default function App() {
         <header className="topbar">
           <img className="brand-logo" src={logoSrc} alt="Embeddly" />
           <div className="topbar-actions">
-            <ModelStatusBar embeddingSetup={embeddingSetup} llmSetup={llmSetup} />
+            <ModelStatusBar
+              embeddingSetup={embeddingSetup}
+              llmSetup={llmSetup}
+              vectorDbSetup={vectorDbSetup}
+            />
             <a className="icon-button" href="#settings" aria-label="Open settings">
               <Settings size={20} />
             </a>

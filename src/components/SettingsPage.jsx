@@ -17,8 +17,10 @@ import logoSrc from '../../ref/embedly.png';
 import {
   EMBEDDING_SETUP_STORAGE_KEY,
   LLM_SETUP_STORAGE_KEY,
+  VECTOR_DB_SETUP_STORAGE_KEY,
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
+  readSavedVectorDbSetup,
 } from '../lib/storage.js';
 import './SettingsPage.css';
 
@@ -79,8 +81,9 @@ export default function SettingsPage() {
   );
   const [selectedLlmModel, setSelectedLlmModel] = useState(llmSetup?.model ?? '');
   const [isEditingLlmSetup, setIsEditingLlmSetup] = useState(!llmSetup);
+  const [vectorDbSetup, setVectorDbSetup] = useState(readSavedVectorDbSetup);
   const [selectedVectorDbProvider, setSelectedVectorDbProvider] = useState(
-    vectorDbProviders[0].id,
+    vectorDbSetup?.provider ?? vectorDbProviders[0].id,
   );
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const activeProvider = embeddingProviders.find((provider) => provider.id === selectedProvider);
@@ -122,6 +125,23 @@ export default function SettingsPage() {
     window.localStorage.setItem(LLM_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
     setLlmSetup(nextSetup);
     setIsEditingLlmSetup(false);
+  };
+
+  const handleSelectVectorDbProvider = (providerId) => {
+    const selectedProviderConfig = vectorDbProviders.find((provider) => provider.id === providerId);
+
+    if (!selectedProviderConfig) {
+      return;
+    }
+
+    const nextSetup = {
+      provider: selectedProviderConfig.id,
+      name: selectedProviderConfig.name,
+    };
+
+    window.localStorage.setItem(VECTOR_DB_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
+    setVectorDbSetup(nextSetup);
+    setSelectedVectorDbProvider(providerId);
   };
 
   return (
@@ -199,7 +219,7 @@ export default function SettingsPage() {
               <VectorDbSettingsPanel
                 selectedProvider={selectedVectorDbProvider}
                 ActiveProviderSetup={ActiveVectorDbSetup}
-                onSelectProvider={setSelectedVectorDbProvider}
+                onSelectProvider={handleSelectVectorDbProvider}
               />
             )}
 
