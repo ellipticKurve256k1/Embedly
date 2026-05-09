@@ -9,11 +9,54 @@ const DEFAULT_VECTOR_DB_SETUP = {
 };
 
 export const DEFAULT_CHUNKING_CONFIG = {
-  strategy: 'paragraph',
-  maxChunkSize: 1000,
-  minChunkSize: 50,
-  overlap: 100,
+  strategy: 'recursive',
+  targetTokens: 450,
+  maxTokens: 800,
+  minTokens: 40,
+  overlapTokens: 80,
+  maxChunkSize: 3200,
+  minChunkSize: 160,
+  overlap: 320,
 };
+
+function coerceNumber(value, fallback) {
+  const nextValue = Number(value);
+  return Number.isFinite(nextValue) ? nextValue : fallback;
+}
+
+export function normalizeChunkingConfig(config = {}) {
+  const input = config && typeof config === 'object' ? config : {};
+  const strategy = ['recursive', 'paragraph', 'fixed'].includes(input.strategy)
+    ? input.strategy
+    : DEFAULT_CHUNKING_CONFIG.strategy;
+  const maxTokens = Math.max(
+    100,
+    coerceNumber(input.maxTokens, Math.ceil(coerceNumber(input.maxChunkSize, 3200) / 4)),
+  );
+  const targetTokens = Math.min(
+    maxTokens,
+    Math.max(100, coerceNumber(input.targetTokens, DEFAULT_CHUNKING_CONFIG.targetTokens)),
+  );
+  const minTokens = Math.min(
+    targetTokens,
+    Math.max(1, coerceNumber(input.minTokens, Math.ceil(coerceNumber(input.minChunkSize, 160) / 4))),
+  );
+  const overlapTokens = Math.min(
+    targetTokens - 1,
+    Math.max(0, coerceNumber(input.overlapTokens, Math.ceil(coerceNumber(input.overlap, 320) / 4))),
+  );
+
+  return {
+    strategy,
+    targetTokens,
+    maxTokens,
+    minTokens,
+    overlapTokens,
+    maxChunkSize: Math.max(100, coerceNumber(input.maxChunkSize, maxTokens * 4)),
+    minChunkSize: Math.max(1, coerceNumber(input.minChunkSize, minTokens * 4)),
+    overlap: Math.max(0, coerceNumber(input.overlap, overlapTokens * 4)),
+  };
+}
 
 export function readSavedSetup(storageKey) {
   try {
@@ -37,5 +80,5 @@ export function readSavedVectorDbSetup() {
 }
 
 export function readSavedChunkingConfig() {
-  return readSavedSetup(CHUNKING_CONFIG_STORAGE_KEY) ?? DEFAULT_CHUNKING_CONFIG;
+  return normalizeChunkingConfig(readSavedSetup(CHUNKING_CONFIG_STORAGE_KEY) ?? DEFAULT_CHUNKING_CONFIG);
 }

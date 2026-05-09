@@ -23,6 +23,7 @@ import {
   readSavedChunkingConfig,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
+  normalizeChunkingConfig,
 } from '../lib/storage.js';
 import './SettingsPage.css';
 
@@ -253,15 +254,6 @@ export default function SettingsPage() {
   );
 }
 
-function normalizeChunkingConfig(config) {
-  return {
-    strategy: config.strategy === 'fixed' ? 'fixed' : 'paragraph',
-    maxChunkSize: Math.max(100, Number(config.maxChunkSize) || 1000),
-    minChunkSize: Math.max(1, Number(config.minChunkSize) || 50),
-    overlap: Math.max(0, Number(config.overlap) || 0),
-  };
-}
-
 function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
   const updateConfig = (field, value) => {
     onChange((currentConfig) => ({
@@ -281,18 +273,19 @@ function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
         <label className="settings-field">
           <span>
             <strong>Split strategy</strong>
-            <small>Paragraph preserves semantic boundaries. Fixed uses character windows.</small>
+            <small>Recursive keeps structure first, then splits oversized sections safely.</small>
           </span>
           <select
             value={chunkingConfig.strategy}
             onChange={(event) => updateConfig('strategy', event.target.value)}
           >
+            <option value="recursive">Recursive</option>
             <option value="paragraph">Paragraph</option>
             <option value="fixed">Fixed</option>
           </select>
         </label>
 
-        {chunkingConfig.strategy === 'fixed' && (
+        {chunkingConfig.strategy === 'fixed' ? (
           <label className="settings-field">
             <span>
               <strong>Max chunk size</strong>
@@ -306,36 +299,88 @@ function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
               onChange={(event) => updateConfig('maxChunkSize', Number(event.target.value))}
             />
           </label>
+        ) : (
+          <>
+            <label className="settings-field">
+              <span>
+                <strong>Target chunk size</strong>
+                <small>Approximate token budget for each semantic chunk.</small>
+              </span>
+              <input
+                min="100"
+                step="25"
+                type="number"
+                value={chunkingConfig.targetTokens}
+                onChange={(event) => updateConfig('targetTokens', Number(event.target.value))}
+              />
+            </label>
+
+            <label className="settings-field">
+              <span>
+                <strong>Hard max size</strong>
+                <small>Oversized sections are recursively split under this limit.</small>
+              </span>
+              <input
+                min="100"
+                step="25"
+                type="number"
+                value={chunkingConfig.maxTokens}
+                onChange={(event) => updateConfig('maxTokens', Number(event.target.value))}
+              />
+            </label>
+          </>
         )}
 
         <label className="settings-field">
           <span>
-            <strong>Min chunk size</strong>
-            <small>Discard chunks shorter than this many characters.</small>
+            <strong>{chunkingConfig.strategy === 'fixed' ? 'Min chunk size' : 'Min token size'}</strong>
+            <small>
+              {chunkingConfig.strategy === 'fixed'
+                ? 'Discard chunks shorter than this many characters.'
+                : 'Merge or discard fragments below this approximate token count.'}
+            </small>
           </span>
           <input
             min="1"
             step="10"
             type="number"
-            value={chunkingConfig.minChunkSize}
-            onChange={(event) => updateConfig('minChunkSize', Number(event.target.value))}
+            value={chunkingConfig.strategy === 'fixed'
+              ? chunkingConfig.minChunkSize
+              : chunkingConfig.minTokens}
+            onChange={(event) => updateConfig(
+              chunkingConfig.strategy === 'fixed' ? 'minChunkSize' : 'minTokens',
+              Number(event.target.value),
+            )}
           />
         </label>
 
         <label className="settings-field">
           <span>
             <strong>Overlap</strong>
-            <small>Characters repeated between adjacent fixed chunks.</small>
+            <small>
+              {chunkingConfig.strategy === 'fixed'
+                ? 'Characters repeated between adjacent fixed chunks.'
+                : 'Approximate tokens repeated between adjacent semantic chunks.'}
+            </small>
           </span>
           <input
             min="0"
-            max="500"
+            max={chunkingConfig.strategy === 'fixed' ? '500' : '200'}
             step="10"
             type="range"
-            value={chunkingConfig.overlap}
-            onChange={(event) => updateConfig('overlap', Number(event.target.value))}
+            value={chunkingConfig.strategy === 'fixed'
+              ? chunkingConfig.overlap
+              : chunkingConfig.overlapTokens}
+            onChange={(event) => updateConfig(
+              chunkingConfig.strategy === 'fixed' ? 'overlap' : 'overlapTokens',
+              Number(event.target.value),
+            )}
           />
-          <em>{chunkingConfig.overlap} characters</em>
+          <em>
+            {chunkingConfig.strategy === 'fixed'
+              ? `${chunkingConfig.overlap} characters`
+              : `${chunkingConfig.overlapTokens} tokens`}
+          </em>
         </label>
       </div>
 
