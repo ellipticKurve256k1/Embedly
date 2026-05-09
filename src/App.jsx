@@ -1,17 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Search, Settings } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Search, Settings, LoaderCircle } from 'lucide-react';
 import logoSrc from '../ref/embedly.png';
 import {
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
 } from './lib/storage.js';
+import { searchQuery } from './lib/api.js';
 import './index.css';
 import './App.css';
 import SettingsPage from './components/SettingsPage';
 import ModeTabs from './components/ModeTabs';
 import UploadBox from './components/UploadBox';
 import ModelStatusBar from './components/ModelStatusBar';
+import OntologyMap from './components/OntologyMap';
+import ResultPanel from './components/ResultPanel';
 
 export default function App() {
   const [page, setPage] = useState(() => (
@@ -22,6 +25,12 @@ export default function App() {
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
   const [llmSetup, setLlmSetup] = useState(() => readSavedLlmSetup());
   const [vectorDbSetup, setVectorDbSetup] = useState(() => readSavedVectorDbSetup());
+
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [selectedResult, setSelectedResult] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -36,9 +45,51 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  const handleSearch = useCallback(async (queryText) => {
+    const trimmedQuery = queryText.trim();
+    if (!trimmedQuery) return;
+
+    setIsSearching(true);
+    setSearchError('');
+    setSelectedResult(null);
+
+    try {
+      const payload = await searchQuery(trimmedQuery);
+      setSearchResults(payload.results ?? []);
+    } catch (error) {
+      setSearchError(error instanceof Error ? error.message : 'Search failed');
+      setSearchResults(null);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleSearch(query);
+    }
+  }, [query, handleSearch]);
+
+  const handleSelectNode = useCallback((result) => {
+    setSelectedResult(result);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedResult(null);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setQuery('');
+    setSearchResults(null);
+    setSelectedResult(null);
+    setSearchError('');
+  }, []);
+
   if (page === 'settings') {
     return <SettingsPage />;
   }
+
+  const hasResults = searchResults && searchResults.length > 0;
 
   return (
     <main className="app">
@@ -60,17 +111,63 @@ export default function App() {
         <ModeTabs activeMode={mode} onModeChange={setMode} />
 
         {mode === 'search' && (
-          <div className="search-stage">
-            <div className="orbital-field" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
+          <div className={`search-stage${hasResults ? ' has-results' : ''}`}>
+            {!hasResults && (
+              <div className="orbital-field" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
 
             <label className="search-box">
               <Search size={20} />
-              <input type="search" placeholder="Search your knowledge base..." />
+              <input
+                type="search"
+                placeholder="Search your knowledge base..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isSearching}
+              />
+              {isSearching && (
+                <LoaderCircle size={20} className="search-spinner" />
+              )}
             </label>
+
+            {searchError && (
+              <div className="search-error" role="alert">
+                {searchError}
+              </div>
+            )}
+
+            {hasResults && (
+              <div className="ontology-container">
+                <div className="ontology-map-wrapper">
+                  <OntologyMap
+                    query={query}
+                    results={searchResults}
+                    selectedId={selectedResult?.chunkId}
+                    onSelectNode={handleSelectNode}
+                  />
+                </div>
+                {selectedResult && (
+                  <ResultPanel
+                    result={selectedResult}
+                    onClose={handleClosePanel}
+                  />
+                )}
+              </div>
+            )}
+
+            {searchResults && searchResults.length === 0 && !isSearching && (
+              <div className="search-empty">
+                <p>No matching results found.</p>
+                <button type="button" onClick={handleClearSearch}>
+                  Clear search
+                </button>
+              </div>
+            )}
           </div>
         )}
 

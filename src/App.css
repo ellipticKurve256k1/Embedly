@@ -8,6 +8,13 @@
   padding: clamp(24px, 4vh, 48px) 0;
 }
 
+.search-stage.has-results {
+  grid-template-rows: auto 1fr;
+  justify-items: stretch;
+  gap: clamp(16px, 2vh, 24px);
+  padding: clamp(12px, 2vh, 20px) 0;
+}
+
 .orbital-field {
   position: absolute;
   width: min(58vh, 62vw, 620px);
@@ -73,6 +80,17 @@
     0 22px 42px rgba(72, 83, 138, 0.16),
     0 8px 18px rgba(83, 95, 141, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.has-results .search-box {
+  width: min(50vw, 520px);
+  min-height: 56px;
+  gap: 14px;
+  padding: 0 24px;
+  box-shadow:
+    0 12px 28px rgba(72, 83, 138, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.94);
 }
 
 .search-box svg {
@@ -84,6 +102,11 @@
   stroke-linejoin: round;
   stroke-width: 1.9;
   flex: 0 0 auto;
+}
+
+.has-results .search-box svg {
+  width: 22px;
+  height: 22px;
 }
 
 .search-box input {
@@ -98,13 +121,94 @@
   font-weight: 500;
 }
 
+.has-results .search-box input {
+  font-size: clamp(15px, 1.5vw, 17px);
+}
+
 .search-box input::placeholder {
   color: #8f98ab;
+}
+
+.search-spinner {
+  animation: search-spin 800ms linear infinite;
+}
+
+@keyframes search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.search-error {
+  position: relative;
+  z-index: 2;
+  width: min(68vw, 760px);
+  min-width: min(100%, 360px);
+  padding: 12px 18px;
+  border: 1px solid rgba(210, 83, 100, 0.24);
+  border-radius: 12px;
+  color: #9f4452;
+  background: rgba(255, 246, 248, 0.88);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.ontology-container {
+  display: flex;
+  gap: clamp(16px, 2vw, 28px);
+  width: 100%;
+  min-height: 0;
+  padding: 0 clamp(20px, 3vw, 40px);
+}
+
+.ontology-map-wrapper {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.search-empty {
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: clamp(40px, 8vh, 80px) clamp(20px, 3vw, 40px);
+  text-align: center;
+}
+
+.search-empty p {
+  margin: 0;
+  color: #6f7a94;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.search-empty button {
+  padding: 8px 20px;
+  border: 1px solid rgba(132, 146, 184, 0.24);
+  border-radius: 999px;
+  color: #6258ff;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+
+.search-empty button:hover {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 20px rgba(76, 88, 139, 0.12);
 }
 
 @media (max-width: 680px) {
   .search-stage {
     padding: clamp(40px, 8vh, 80px) 0;
+  }
+
+  .search-stage.has-results {
+    padding: 12px 0;
+    gap: 12px;
   }
 
   .orbital-field {
@@ -120,8 +224,28 @@
     padding: 0 20px;
   }
 
+  .has-results .search-box {
+    width: 100%;
+    min-height: 52px;
+  }
+
   .search-box svg {
     width: 24px;
     height: 24px;
+  }
+
+  .has-results .search-box svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ontology-container {
+    flex-direction: column;
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .ontology-map-wrapper {
+    min-height: 280px;
   }
 }
