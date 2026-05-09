@@ -10,12 +10,13 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: clamp(14px, 2vh, 20px);
-  padding: 0 clamp(10px, 1.2vw, 16px) 0;
+  padding: 0;
 }
 
 .settings-heading {
   display: grid;
   gap: 8px;
+  padding: 0 clamp(20px, 3vw, 38px);
 }
 
 .settings-heading h1,
@@ -51,7 +52,7 @@
   display: grid;
   align-content: start;
   gap: 6px;
-  padding: 6px clamp(10px, 1.2vw, 18px) 0 0;
+  padding: 6px 18px 0 clamp(20px, 3vw, 38px);
   border-right: 1px solid rgba(132, 146, 184, 0.18);
 }
 
@@ -95,11 +96,10 @@
 
 .settings-detail {
   min-width: 0;
-  overflow: auto;
   display: grid;
   align-content: start;
   gap: 20px;
-  padding: 16px 0 8px 28px;
+  padding: 16px clamp(20px, 3vw, 38px) 8px 28px;
 }
 
 .settings-detail-heading {
@@ -519,9 +519,12 @@
 
 @media (max-width: 680px) {
   .settings-content {
-    overflow: auto;
     gap: 8px;
-    padding: 2px 0 0;
+    padding: 0;
+  }
+
+  .settings-heading {
+    padding: 0 18px;
   }
 
   .settings-heading h1 {
@@ -543,7 +546,7 @@
     display: flex;
     gap: 6px;
     overflow-x: auto;
-    padding: 10px 0 4px;
+    padding: 10px 18px 4px;
     border-right: 0;
   }
 
@@ -556,9 +559,8 @@
   }
 
   .settings-detail {
-    overflow: visible;
     gap: 10px;
-    padding: 8px 0 0;
+    padding: 8px 18px 0;
   }
 
   .model-options {
