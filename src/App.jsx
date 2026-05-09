@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Settings, Shield, Sparkles, Layers } from 'lucide-react';
+import { Search, Settings } from 'lucide-react';
 import logoSrc from '../ref/embedly.png';
 import { readSavedEmbeddingSetup, readSavedLlmSetup } from './lib/storage.js';
 import './index.css';
@@ -8,24 +8,6 @@ import SettingsPage from './components/SettingsPage';
 import ModeTabs from './components/ModeTabs';
 import UploadBox from './components/UploadBox';
 import ModelStatusBar from './components/ModelStatusBar';
-
-const features = [
-  {
-    title: 'Private & Secure',
-    subtitle: 'Your data stays yours',
-    icon: Shield,
-  },
-  {
-    title: 'AI Powered',
-    subtitle: 'Semantic search',
-    icon: Sparkles,
-  },
-  {
-    title: 'Connected',
-    subtitle: 'Smart relationships',
-    icon: Layers,
-  },
-];
 
 export default function App() {
   const [page, setPage] = useState(() => (
@@ -83,20 +65,6 @@ export default function App() {
         )}
 
         {mode === 'upload' && <UploadBox />}
-
-        {mode === 'search' && (
-          <div className="feature-row" aria-label="Product highlights">
-            {features.map(({ title, subtitle, icon: Icon }) => (
-              <article className="feature-pill" key={title}>
-                <Icon size={20} />
-                <span>
-                  <strong>{title}</strong>
-                  <small>{subtitle}</small>
-                </span>
-              </article>
-            ))}
-          </div>
-        )}
       </section>
     </main>
   );
