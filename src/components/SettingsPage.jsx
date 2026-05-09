@@ -28,6 +28,7 @@ const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
   { id: 'retrieval', label: 'Retrieval', icon: Search },
   { id: 'generation', label: 'Generation', icon: WandSparkles },
+  { id: 'vector-db', label: 'VectorDB', icon: Database },
   { id: 'data-sources', label: 'Data Sources', icon: Database },
   { id: 'security', label: 'Security', icon: LockKeyhole },
   { id: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
@@ -54,6 +55,16 @@ const llmProviders = [
   },
 ];
 
+const vectorDbProviders = [
+  {
+    id: 'sqlite',
+    name: 'SQLite',
+    summary: 'Use a local SQLite database for vector indexes and metadata.',
+    icon: Database,
+    component: SQLiteVectorDbSetup,
+  },
+];
+
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('embedding');
   const [embeddingSetup, setEmbeddingSetup] = useState(readSavedEmbeddingSetup);
@@ -68,11 +79,18 @@ export default function SettingsPage() {
   );
   const [selectedLlmModel, setSelectedLlmModel] = useState(llmSetup?.model ?? '');
   const [isEditingLlmSetup, setIsEditingLlmSetup] = useState(!llmSetup);
+  const [selectedVectorDbProvider, setSelectedVectorDbProvider] = useState(
+    vectorDbProviders[0].id,
+  );
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const activeProvider = embeddingProviders.find((provider) => provider.id === selectedProvider);
   const ActiveProviderSetup = activeProvider?.component;
   const activeLlmProvider = llmProviders.find((provider) => provider.id === selectedLlmProvider);
   const ActiveLlmProviderSetup = activeLlmProvider?.component;
+  const activeVectorDbProvider = vectorDbProviders.find(
+    (provider) => provider.id === selectedVectorDbProvider,
+  );
+  const ActiveVectorDbSetup = activeVectorDbProvider?.component;
 
   const handleSaveEmbeddingChanges = () => {
     if (!selectedProvider || !selectedModel) {
@@ -177,13 +195,51 @@ export default function SettingsPage() {
               />
             )}
 
-            {activeSection !== 'embedding' && activeSection !== 'generation' && (
+            {activeSection === 'vector-db' && (
+              <VectorDbSettingsPanel
+                selectedProvider={selectedVectorDbProvider}
+                ActiveProviderSetup={ActiveVectorDbSetup}
+                onSelectProvider={setSelectedVectorDbProvider}
+              />
+            )}
+
+            {activeSection !== 'embedding'
+              && activeSection !== 'generation'
+              && activeSection !== 'vector-db' && (
               <PlaceholderSettingsPanel section={settingTabs.find((tab) => tab.id === activeSection)} />
             )}
           </div>
         </div>
       </section>
     </main>
+  );
+}
+
+function VectorDbSettingsPanel({
+  selectedProvider,
+  ActiveProviderSetup,
+  onSelectProvider,
+}) {
+  return (
+    <section className="settings-detail" aria-labelledby="vector-db-title">
+      <div className="settings-detail-heading">
+        <h2 id="vector-db-title">VectorDB</h2>
+        <p>
+          Choose where Embeddly stores vector indexes, chunk metadata, and retrieval-ready
+          embeddings.
+        </p>
+      </div>
+
+      <ProviderOptions
+        legend="Vector database options"
+        name="vector-db-provider"
+        providers={vectorDbProviders}
+        selectedProvider={selectedProvider}
+        onSelectProvider={onSelectProvider}
+      />
+
+      {ActiveProviderSetup && <ActiveProviderSetup />}
+    </section>
   );
 }
 
@@ -437,6 +493,27 @@ function OllamaLlmSetup({ endpoint, selectedModel, onSelectModel }) {
       radioName="ollama-llm-model"
       isSupportedModel={isLlmModel}
     />
+  );
+}
+
+function SQLiteVectorDbSetup() {
+  return (
+    <section className="provider-setup" aria-label="SQLite vector database setup">
+      <div className="provider-setup-header">
+        <span>
+          <strong>SQLite vector store</strong>
+          <small>Local file-backed storage for private, single-user retrieval workflows.</small>
+        </span>
+      </div>
+
+      <div className="setup-message">
+        <Database size={18} />
+        <span>
+          SQLite is ready to use as the local VectorDB option.
+          <small>Additional providers can be added through the vectorDbProviders list.</small>
+        </span>
+      </div>
+    </section>
   );
 }
 
