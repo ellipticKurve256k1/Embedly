@@ -1,6 +1,6 @@
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
 
-const MAX_CONTEXT_CHUNKS = 3;
+const MAX_CONTEXT_CHUNKS = 5;
 const MAX_CONTEXT_CHARS = 3500;
 const MAX_CHUNK_CHARS = 1000;
 const MAX_REWRITE_HISTORY_MESSAGES = 6;

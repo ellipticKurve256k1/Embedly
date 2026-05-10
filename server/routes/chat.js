@@ -7,7 +7,7 @@ import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
 const router = express.Router();
 const conversations = new Map();
 const MAX_HISTORY_MESSAGES = 6;
-const CHAT_RETRIEVAL_LIMIT = 3;
+const CHAT_RETRIEVAL_LIMIT = 5;
 
 function writeSse(response, event, data) {
   response.write(`event: ${event}\n`);

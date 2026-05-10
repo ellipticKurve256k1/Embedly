@@ -6,7 +6,7 @@ import {
   embedText,
 } from './embedder.js';
 
-export const DEFAULT_RETRIEVAL_LIMIT = 10;
+export const DEFAULT_RETRIEVAL_LIMIT = 5;
 
 export function toPublicChunk(row, score) {
   return {
