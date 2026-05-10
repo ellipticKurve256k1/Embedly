@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { streamChatResponse } from '../lib/api.js';
 import ChatInput from './ChatInput.jsx';
 import MessageList from './MessageList.jsx';
-import SearchPanel from './SearchPanel.jsx';
+import SourcesPanel from './SourcesPanel.jsx';
 import './ChatPanel.css';
 
 function createMessage(role, content, extra = {}) {
@@ -20,7 +20,7 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [retrievedChunks, setRetrievedChunks] = useState([]);
-  const [isSearchPanelOpen, setIsSearchPanelOpen] = useState(false);
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(true);
   const [contextStatus, setContextStatus] = useState(null);
   const [chatError, setChatError] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -47,7 +47,6 @@ export default function ChatPanel() {
     setInputValue('');
     setChatError('');
     setContextStatus({ type: 'info', message: 'Retrieving relevant chunks...' });
-    setIsSearchPanelOpen(true);
     setRetrievedChunks([]);
     setMessages((currentMessages) => [...currentMessages, userMessage, assistantMessage]);
     setIsSearching(true);
@@ -61,8 +60,18 @@ export default function ChatPanel() {
         onContext: (payload) => {
           const chunks = payload?.chunks ?? [];
           setRetrievedChunks(chunks);
-          setIsSearchPanelOpen(true);
           setIsSearching(false);
+
+          // Auto-expand sources panel when chunks arrive
+          if (chunks.length > 0 && sourcesCollapsed) {
+            setSourcesCollapsed(false);
+          }
+
+          // Attach chunks to assistant message for citations
+          updateAssistantMessage(assistantMessage.id, (message) => ({
+            ...message,
+            sourceChunks: chunks,
+          }));
 
           if (payload?.error) {
             setContextStatus({
@@ -112,17 +121,17 @@ export default function ChatPanel() {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [conversationId, isStreaming, updateAssistantMessage]);
+  }, [conversationId, isStreaming, sourcesCollapsed, updateAssistantMessage]);
 
   return (
     <section className="chat-panel" aria-label="Knowledge chat">
       <div className="chat-panel__body">
         <MessageList messages={messages} isSearching={isSearching} />
-        <SearchPanel
-          isOpen={isSearchPanelOpen}
+        <SourcesPanel
+          isOpen={!sourcesCollapsed}
           chunks={retrievedChunks}
           status={contextStatus}
-          onClose={() => setIsSearchPanelOpen(false)}
+          onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
         />
       </div>
 

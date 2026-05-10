@@ -1,0 +1,227 @@
+.sources-panel {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: 48px;
+  border-left: 1px solid rgba(132, 146, 184, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: -8px 0 24px rgba(72, 83, 138, 0.06);
+  transition: width 200ms ease;
+  overflow: hidden;
+}
+
+.sources-panel.is-open {
+  width: min(360px, 42vw);
+}
+
+/* Collapsed state */
+.sources-panel__collapsed-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 48px;
+  padding: 18px 0;
+  border: 0;
+  color: #65718b;
+  background: transparent;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.sources-panel__collapsed-bar:hover {
+  color: #574cff;
+}
+
+.sources-panel__collapsed-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8c96ad;
+}
+
+.sources-panel__collapsed-count {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #6258ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Expanded state */
+.sources-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 20px 14px;
+  flex: 0 0 auto;
+}
+
+.sources-panel__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6258ff;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sources-panel h2 {
+  margin: 6px 0 0;
+  color: #17213b;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.sources-panel__toggle {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(132, 146, 184, 0.2);
+  border-radius: 12px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.sources-panel__toggle:hover {
+  color: #574cff;
+}
+
+.sources-panel__status {
+  margin: 0 20px 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.sources-panel__status--info {
+  color: #65718b;
+  background: rgba(132, 146, 184, 0.1);
+}
+
+.sources-panel__status--warning {
+  color: #8a6333;
+  background: rgba(212, 160, 18, 0.13);
+}
+
+.sources-panel__status--error {
+  color: #9f4452;
+  background: rgba(210, 83, 100, 0.1);
+}
+
+.sources-panel__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 18px;
+}
+
+.sources-panel__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sources-panel__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sources-panel__list::-webkit-scrollbar-thumb {
+  background: rgba(132, 146, 184, 0.28);
+  border-radius: 999px;
+}
+
+.sources-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 12px;
+  text-align: center;
+}
+
+.sources-panel__empty p {
+  margin: 0;
+  color: #8c96ad;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sources-panel__empty span {
+  color: #a0aac4;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.sources-panel__chunk {
+  padding: 16px 4px;
+  border-top: 1px solid rgba(132, 146, 184, 0.14);
+}
+
+.sources-panel__chunk-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sources-panel__chunk-top svg {
+  flex: 0 0 auto;
+  color: #6258ff;
+}
+
+.sources-panel__chunk-top strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #1a2035;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sources-panel__chunk-top span {
+  flex: 0 0 auto;
+  color: #2f7b5f;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sources-panel__chunk p {
+  margin: 10px 0;
+  color: #6b7793;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.sources-panel__chunk small {
+  color: #9aa5bf;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 680px) {
+  .sources-panel.is-open {
+    width: 100%;
+  }
+}

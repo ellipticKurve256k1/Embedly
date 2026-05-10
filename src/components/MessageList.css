@@ -229,6 +229,103 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+/* Citation styles */
+.citation {
+  display: inline;
+}
+
+.citation__fallback {
+  color: #6258ff;
+  font-weight: 700;
+}
+
+.citation__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  margin: 0 1px;
+  border: 1px solid rgba(98, 88, 255, 0.25);
+  border-radius: 8px;
+  color: #6258ff;
+  background: rgba(98, 88, 255, 0.08);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.citation__trigger:hover {
+  background: rgba(98, 88, 255, 0.16);
+  border-color: rgba(98, 88, 255, 0.4);
+}
+
+.citation__trigger.is-expanded {
+  background: rgba(98, 88, 255, 0.2);
+  border-color: rgba(98, 88, 255, 0.5);
+}
+
+.citation__arrow {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.citation__popup {
+  display: block;
+  margin: 10px 0 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(247, 250, 255, 0.95);
+  box-shadow: 0 8px 24px rgba(72, 83, 138, 0.1);
+  animation: citation-enter 180ms ease;
+}
+
+@keyframes citation-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.citation__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #6b7793;
+  font-size: 12px;
+}
+
+.citation__header svg {
+  flex: 0 0 auto;
+  color: #6258ff;
+}
+
+.citation__header strong {
+  color: #1a2035;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.citation__header span {
+  color: #8c96ad;
+}
+
+.citation__content {
+  display: block;
+  margin: 0;
+  color: #3b4562;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 680px) {
   .message-list {
     padding: 12px 2px;
@@ -253,5 +350,13 @@
   .message__bubble {
     border-radius: 16px;
     padding: 13px 15px;
+  }
+
+  .citation__popup {
+    padding: 12px 14px;
+  }
+
+  .citation__content {
+    font-size: 13px;
   }
 }
