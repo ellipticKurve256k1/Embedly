@@ -1,7 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_EMBEDDING_MODEL } from '../services/embedder.js';
-import { buildChatMessages, rewriteRetrievalQuery, streamOllamaChat } from '../services/llm.js';
+import { buildChatMessages, rewriteRetrievalQuery, streamChat } from '../services/llm.js';
 import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
 
 const router = express.Router();
@@ -46,7 +46,14 @@ function selectBetterChunks(originalChunks, rewrittenChunks) {
 
 router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
-  const model = String(request.body?.model ?? '').trim();
+  const rawLlmSetup = request.body?.llmSetup && typeof request.body.llmSetup === 'object'
+    ? request.body.llmSetup
+    : {};
+  const provider = rawLlmSetup.provider === 'api' ? 'api' : 'ollama';
+  const model = String(rawLlmSetup.model ?? request.body?.model ?? '').trim();
+  const endpoint = String(rawLlmSetup.endpoint ?? '').trim();
+  const apiKey = String(rawLlmSetup.apiKey ?? '').trim();
+  const llmConfig = { provider, model, endpoint, apiKey };
   const embeddingModel = String(request.body?.embeddingModel || DEFAULT_EMBEDDING_MODEL).trim();
   const rawConversationId = request.body?.conversationId;
   const conversationId = (typeof rawConversationId === 'string' && rawConversationId.trim())
@@ -72,6 +79,16 @@ router.post('/', async (request, response) => {
     return;
   }
 
+  if (provider === 'api' && (!endpoint || !apiKey)) {
+    writeSse(response, 'error', {
+      error: !endpoint
+        ? 'External API endpoint is not configured. Open Settings and add an endpoint URL.'
+        : 'External API key is not configured. Open Settings and add an API key.',
+    });
+    response.end();
+    return;
+  }
+
   try {
     const startedAt = performance.now();
     const history = getConversationHistory(conversationId);
@@ -91,7 +108,11 @@ router.post('/', async (request, response) => {
           model: embeddingModel,
           limit: CHAT_RETRIEVAL_LIMIT,
         });
-        const rewritePromise = rewriteRetrievalQuery({ model, message, history });
+        const rewritePromise = rewriteRetrievalQuery({
+          ...llmConfig,
+          message,
+          history,
+        });
 
         const [originalChunksResult, rewrittenQuery] = await Promise.allSettled([
           originalRetrieval,
@@ -185,11 +206,11 @@ router.post('/', async (request, response) => {
     const messages = buildChatMessages({ message, history, chunks });
     let assistantContent = '';
     let firstTokenAt = null;
-    let ollamaStats = null;
+    let generationStats = null;
 
-    for await (const chunk of streamOllamaChat({ model, messages })) {
+    for await (const chunk of streamChat({ ...llmConfig, messages })) {
       if (typeof chunk !== 'string') {
-        ollamaStats = chunk.stats;
+        generationStats = chunk.stats;
         continue;
       }
 
@@ -202,6 +223,7 @@ router.post('/', async (request, response) => {
     writeSse(response, 'done', { conversationId });
 
     console.info('chat timing', {
+      provider,
       model,
       chunkCount: chunks.length,
       historyMessages: history.length,
@@ -211,8 +233,8 @@ router.post('/', async (request, response) => {
       retrievalMs,
       firstTokenMs: firstTokenAt ? Math.round(firstTokenAt - startedAt) : null,
       totalMs: Math.round(performance.now() - startedAt),
-      promptEvalCount: ollamaStats?.promptEvalCount,
-      evalCount: ollamaStats?.evalCount,
+      promptEvalCount: generationStats?.promptEvalCount,
+      evalCount: generationStats?.evalCount,
     });
   } catch (error) {
     writeSse(response, 'error', {

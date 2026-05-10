@@ -6,6 +6,10 @@ function formatProviderName(provider) {
     return 'Ollama';
   }
 
+  if (provider === 'api') {
+    return 'External API';
+  }
+
   if (provider === 'sqlite') {
     return 'SQLite';
   }

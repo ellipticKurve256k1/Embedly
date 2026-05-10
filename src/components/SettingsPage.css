@@ -371,6 +371,12 @@
   background: rgba(255, 255, 255, 0.68);
 }
 
+.setup-message.is-warning {
+  border-color: rgba(213, 153, 57, 0.28);
+  color: #8a5c16;
+  background: rgba(255, 249, 231, 0.88);
+}
+
 .setup-message.is-error {
   border-color: rgba(210, 83, 100, 0.22);
   color: #9f4452;
@@ -404,6 +410,27 @@
   font-size: 12px;
   line-height: 1.35;
   font-weight: 650;
+}
+
+.setup-message-dismiss {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  color: currentColor;
+  background: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.setup-message-dismiss:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
 }
 
 .advanced-option {
@@ -478,7 +505,10 @@
 }
 
 .settings-field select,
-.settings-field input[type="number"] {
+.settings-field input[type="number"],
+.settings-field input[type="text"],
+.settings-field input[type="url"],
+.settings-field input[type="password"] {
   padding: 0 12px;
 }
 

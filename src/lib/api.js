@@ -110,7 +110,7 @@ export async function streamChatResponse({
     body: JSON.stringify({
       message,
       conversationId,
-      model: llmSetup?.model,
+      llmSetup: llmSetup ?? null,
       embeddingModel: embeddingSetup?.model,
     }),
   });

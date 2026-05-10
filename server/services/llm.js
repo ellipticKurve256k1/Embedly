@@ -8,6 +8,7 @@ const MAX_REWRITE_HISTORY_CHARS = 2200;
 const MAX_REWRITE_USER_MESSAGE_CHARS = 300;
 const MAX_REWRITE_ASSISTANT_MESSAGE_CHARS = 150;
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? '30m';
+const EXTERNAL_API_CHAT_TIMEOUT_MS = readNumberEnv('EXTERNAL_API_CHAT_TIMEOUT_MS', 60000);
 
 function readNumberEnv(name, fallback) {
   const value = Number(process.env[name] ?? fallback);
@@ -35,6 +36,57 @@ function createTimeoutSignal(timeoutMs) {
     signal: controller.signal,
     clear: () => clearTimeout(timeout),
   };
+}
+
+function normalizeEndpoint(endpoint, fallback = OLLAMA_BASE_URL) {
+  return String(endpoint || fallback).trim().replace(/\/+$/, '');
+}
+
+function buildOpenAiChatCompletionsUrl(endpoint) {
+  const normalizedEndpoint = normalizeEndpoint(endpoint, '');
+
+  if (!normalizedEndpoint) {
+    throw new Error('External API endpoint is required.');
+  }
+
+  if (normalizedEndpoint.endsWith('/chat/completions')) {
+    return normalizedEndpoint;
+  }
+
+  return `${normalizedEndpoint}/chat/completions`;
+}
+
+function validateExternalApiConfig({ model, endpoint, apiKey }) {
+  if (!model) {
+    throw new Error('External API model is not configured.');
+  }
+
+  if (!endpoint) {
+    throw new Error('External API endpoint is not configured.');
+  }
+
+  if (!apiKey) {
+    throw new Error('External API key is not configured.');
+  }
+}
+
+async function readProviderError(response, providerName) {
+  const rawBody = await response.text().catch(() => '');
+  let message = rawBody || response.statusText;
+
+  if (rawBody) {
+    try {
+      const payload = JSON.parse(rawBody);
+      message = payload.error?.message
+        || payload.error
+        || payload.message
+        || message;
+    } catch {
+      // Use the text body when a provider does not return JSON errors.
+    }
+  }
+
+  throw new Error(`${providerName} request failed (${response.status}): ${message}`);
 }
 
 function formatRewriteHistory(history = []) {
@@ -167,7 +219,22 @@ export function buildChatMessages({ message, history = [], chunks = [] }) {
   ];
 }
 
-export async function rewriteRetrievalQuery({ model, message, history = [] }) {
+export async function rewriteRetrievalQuery({
+  provider = 'ollama',
+  model,
+  endpoint,
+  apiKey,
+  message,
+  history = [],
+}) {
+  if (provider === 'api') {
+    return rewriteWithApi({ model, endpoint, apiKey, message, history });
+  }
+
+  return rewriteWithOllama({ model, endpoint, message, history });
+}
+
+async function rewriteWithOllama({ model, endpoint = OLLAMA_BASE_URL, message, history = [] }) {
   const userMessage = cleanText(message);
 
   if (!userMessage || history.length === 0) {
@@ -206,7 +273,7 @@ export async function rewriteRetrievalQuery({ model, message, history = [] }) {
   const timeout = createTimeoutSignal(OLLAMA_REWRITE_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    const response = await fetch(`${normalizeEndpoint(endpoint)}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: timeout.signal,
@@ -241,8 +308,82 @@ export async function rewriteRetrievalQuery({ model, message, history = [] }) {
   }
 }
 
-export async function* streamOllamaChat({ model, messages }) {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+async function rewriteWithApi({ model, endpoint, apiKey, message, history = [] }) {
+  validateExternalApiConfig({ model, endpoint, apiKey });
+
+  const userMessage = cleanText(message);
+
+  if (!userMessage || history.length === 0) {
+    return userMessage;
+  }
+
+  const recentConversation = formatRewriteHistory(history);
+  if (!recentConversation) {
+    return userMessage;
+  }
+
+  const messages = [
+    {
+      role: 'system',
+      content: [
+        'You rewrite chat follow-up questions into standalone document search queries.',
+        'Use the recent conversation only to resolve references.',
+        'Do not answer the question.',
+        'Do not add facts that are not present in the conversation.',
+        'Return only one concise search query.',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        'Recent conversation:',
+        recentConversation,
+        '',
+        `User question: ${userMessage}`,
+        '',
+        'Standalone search query:',
+      ].join('\n'),
+    },
+  ];
+
+  const timeout = createTimeoutSignal(OLLAMA_REWRITE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(buildOpenAiChatCompletionsUrl(endpoint), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: timeout.signal,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        temperature: 0,
+        max_tokens: 64,
+      }),
+    });
+
+    if (!response.ok) {
+      await readProviderError(response, 'External API rewrite');
+    }
+
+    const payload = await response.json();
+    const rewrittenQuery = cleanRewriteResponse(payload.choices?.[0]?.message?.content);
+
+    if (!isValidRetrievalQuery(rewrittenQuery)) {
+      return userMessage;
+    }
+
+    return rewrittenQuery;
+  } finally {
+    timeout.clear();
+  }
+}
+
+export async function* streamOllamaChat({ model, endpoint = OLLAMA_BASE_URL, messages }) {
+  const response = await fetch(`${normalizeEndpoint(endpoint)}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -321,4 +462,109 @@ export async function* streamOllamaChat({ model, messages }) {
       };
     }
   }
+}
+
+export async function* streamChat({
+  provider = 'ollama',
+  model,
+  endpoint,
+  apiKey,
+  messages,
+}) {
+  if (provider === 'api') {
+    yield* streamApiChat({ model, endpoint, apiKey, messages });
+    return;
+  }
+
+  yield* streamOllamaChat({ model, endpoint, messages });
+}
+
+async function* streamApiChat({ model, endpoint, apiKey, messages }) {
+  validateExternalApiConfig({ model, endpoint, apiKey });
+
+  const timeout = createTimeoutSignal(EXTERNAL_API_CHAT_TIMEOUT_MS);
+  let response;
+
+  try {
+    response = await fetch(buildOpenAiChatCompletionsUrl(endpoint), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: timeout.signal,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        temperature: OLLAMA_TEMPERATURE,
+      }),
+    });
+  } finally {
+    timeout.clear();
+  }
+
+  if (!response.ok) {
+    await readProviderError(response, 'External API chat');
+  }
+
+  if (!response.body) {
+    throw new Error('External API did not return a streaming response.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let tokenCount = 0;
+
+  for await (const chunk of response.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() ?? '';
+
+    for (const event of events) {
+      for (const line of event.split('\n')) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine.startsWith('data:')) continue;
+
+        const data = trimmedLine.slice('data:'.length).trim();
+        if (!data || data === '[DONE]') {
+          continue;
+        }
+
+        const payload = JSON.parse(data);
+        const content = payload.choices?.[0]?.delta?.content;
+
+        if (content) {
+          tokenCount += 1;
+          yield content;
+        }
+      }
+    }
+  }
+
+  const tail = buffer.trim();
+  if (tail) {
+    for (const line of tail.split('\n')) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine.startsWith('data:')) continue;
+
+      const data = trimmedLine.slice('data:'.length).trim();
+      if (!data || data === '[DONE]') continue;
+
+      const payload = JSON.parse(data);
+      const content = payload.choices?.[0]?.delta?.content;
+
+      if (content) {
+        tokenCount += 1;
+        yield content;
+      }
+    }
+  }
+
+  yield {
+    type: 'stats',
+    stats: {
+      evalCount: tokenCount,
+    },
+  };
 }

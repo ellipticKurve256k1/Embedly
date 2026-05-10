@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   CircleHelp,
   Database,
   LockKeyhole,
@@ -28,6 +29,7 @@ import {
 import './SettingsPage.css';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
+const DEFAULT_OPENAI_COMPATIBLE_ENDPOINT = 'https://api.openai.com/v1';
 
 const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
@@ -54,9 +56,18 @@ const llmProviders = [
   {
     id: 'ollama',
     name: 'Ollama',
+    mode: 'Local',
     summary: 'Use local language models served by Ollama for generation.',
     icon: Server,
     component: OllamaLlmSetup,
+  },
+  {
+    id: 'api',
+    name: 'External API',
+    mode: 'Remote',
+    summary: 'Use any OpenAI-compatible API endpoint for generation.',
+    icon: Zap,
+    component: ApiLlmSetup,
   },
 ];
 
@@ -69,6 +80,31 @@ const vectorDbProviders = [
     component: SQLiteVectorDbSetup,
   },
 ];
+
+function normalizeEndpointInput(endpoint) {
+  return String(endpoint ?? '').trim().replace(/\/+$/, '');
+}
+
+function isValidApiEndpoint(endpoint) {
+  const normalizedEndpoint = normalizeEndpointInput(endpoint);
+
+  try {
+    const url = new URL(normalizedEndpoint);
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && (url.pathname === '' || url.pathname === '/' || url.pathname.endsWith('/v1'));
+  } catch {
+    return false;
+  }
+}
+
+function isValidLlmSetup({ provider, endpoint, apiKey }) {
+  if (provider !== 'api') return true;
+  return isValidApiEndpoint(endpoint) && Boolean(String(apiKey ?? '').trim());
+}
+
+function hasModelName(model) {
+  return Boolean(String(model ?? '').trim());
+}
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('embedding');
@@ -83,6 +119,12 @@ export default function SettingsPage() {
     llmSetup?.provider ?? llmProviders[0].id,
   );
   const [selectedLlmModel, setSelectedLlmModel] = useState(llmSetup?.model ?? '');
+  const [selectedLlmEndpoint, setSelectedLlmEndpoint] = useState(
+    llmSetup?.endpoint ?? (
+      llmSetup?.provider === 'api' ? DEFAULT_OPENAI_COMPATIBLE_ENDPOINT : OLLAMA_BASE_URL
+    ),
+  );
+  const [selectedLlmApiKey, setSelectedLlmApiKey] = useState(llmSetup?.apiKey ?? '');
   const [isEditingLlmSetup, setIsEditingLlmSetup] = useState(!llmSetup);
   const [vectorDbSetup, setVectorDbSetup] = useState(readSavedVectorDbSetup);
   const [selectedVectorDbProvider, setSelectedVectorDbProvider] = useState(
@@ -116,15 +158,26 @@ export default function SettingsPage() {
   };
 
   const handleSaveLlmChanges = () => {
-    if (!selectedLlmProvider || !selectedLlmModel) {
+    if (!selectedLlmProvider || !hasModelName(selectedLlmModel) || !isValidLlmSetup({
+      provider: selectedLlmProvider,
+      endpoint: selectedLlmEndpoint,
+      apiKey: selectedLlmApiKey,
+    })) {
       return;
     }
 
-    const nextSetup = {
-      provider: selectedLlmProvider,
-      model: selectedLlmModel,
-      endpoint: OLLAMA_BASE_URL,
-    };
+    const nextSetup = selectedLlmProvider === 'api'
+      ? {
+        provider: selectedLlmProvider,
+        model: selectedLlmModel.trim(),
+        endpoint: normalizeEndpointInput(selectedLlmEndpoint),
+        apiKey: selectedLlmApiKey.trim(),
+      }
+      : {
+        provider: selectedLlmProvider,
+        model: selectedLlmModel.trim(),
+        endpoint: OLLAMA_BASE_URL,
+      };
 
     window.localStorage.setItem(LLM_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
     setLlmSetup(nextSetup);
@@ -221,7 +274,14 @@ export default function SettingsPage() {
                 onSelectProvider={(providerId) => {
                   setSelectedLlmProvider(providerId);
                   setSelectedLlmModel('');
+                  setSelectedLlmEndpoint(providerId === 'api'
+                    ? DEFAULT_OPENAI_COMPATIBLE_ENDPOINT
+                    : OLLAMA_BASE_URL);
                 }}
+                selectedEndpoint={selectedLlmEndpoint}
+                selectedApiKey={selectedLlmApiKey}
+                onEndpointChange={setSelectedLlmEndpoint}
+                onApiKeyChange={setSelectedLlmApiKey}
               />
             )}
 
@@ -422,6 +482,12 @@ function VectorDbSettingsPanel({
 }
 
 function ConfiguredModelCard({ setup, onEdit }) {
+  const providerName = setup.provider === 'api'
+    ? 'External API'
+    : setup.provider === 'ollama'
+      ? 'Ollama'
+      : setup.provider;
+
   return (
     <article className="configured-model-card">
       <span className="provider-icon" aria-hidden="true">
@@ -430,7 +496,7 @@ function ConfiguredModelCard({ setup, onEdit }) {
       <span>
         <strong>{setup.model}</strong>
         <small>
-          {setup.provider === 'ollama' ? 'Ollama' : setup.provider} at {setup.endpoint}
+          {providerName} at {setup.endpoint}
         </small>
       </span>
       <button type="button" onClick={onEdit}>
@@ -506,6 +572,8 @@ function GenerationSettingsPanel({
   llmSetup,
   selectedProvider,
   selectedModel,
+  selectedEndpoint,
+  selectedApiKey,
   isEditingSetup,
   advancedOptionsEnabled,
   ActiveProviderSetup,
@@ -514,7 +582,16 @@ function GenerationSettingsPanel({
   onSave,
   onSelectModel,
   onSelectProvider,
+  onEndpointChange,
+  onApiKeyChange,
 }) {
+  const canSave = hasModelName(selectedModel)
+    && isValidLlmSetup({
+      provider: selectedProvider,
+      endpoint: selectedEndpoint,
+      apiKey: selectedApiKey,
+    });
+
   return (
     <section className="settings-detail" aria-labelledby="generation-title">
       <div className="settings-detail-heading">
@@ -540,9 +617,12 @@ function GenerationSettingsPanel({
 
           {ActiveProviderSetup && (
             <ActiveProviderSetup
-              endpoint={OLLAMA_BASE_URL}
+              endpoint={selectedProvider === 'api' ? selectedEndpoint : OLLAMA_BASE_URL}
               selectedModel={selectedModel}
+              apiKey={selectedApiKey}
               onSelectModel={onSelectModel}
+              onEndpointChange={onEndpointChange}
+              onApiKeyChange={onApiKeyChange}
             />
           )}
         </>
@@ -556,7 +636,7 @@ function GenerationSettingsPanel({
       />
 
       <SaveSettingsButton
-        disabled={!selectedModel}
+        disabled={!canSave}
         label={llmSetup ? 'Save changes' : 'Save setup'}
         onClick={onSave}
       />
@@ -590,7 +670,7 @@ function ProviderOptions({ legend, name, providers, selectedProvider, onSelectPr
             <span className="model-copy">
               <span className="model-title-row">
                 <strong>{provider.name}</strong>
-                <em>Local</em>
+                <em>{provider.mode ?? 'Local'}</em>
               </span>
               <small>{provider.summary}</small>
             </span>
@@ -671,6 +751,103 @@ function OllamaLlmSetup({ endpoint, selectedModel, onSelectModel }) {
       radioName="ollama-llm-model"
       isSupportedModel={isLlmModel}
     />
+  );
+}
+
+function ApiLlmSetup({
+  endpoint,
+  selectedModel,
+  apiKey,
+  onSelectModel,
+  onEndpointChange,
+  onApiKeyChange,
+}) {
+  const [isWarningVisible, setIsWarningVisible] = useState(true);
+  const isEndpointValid = !endpoint || isValidApiEndpoint(endpoint);
+
+  return (
+    <section className="provider-setup" aria-label="External API generation setup">
+      <div className="provider-setup-header">
+        <span>
+          <strong>OpenAI-compatible API</strong>
+          <small>Use OpenAI, Moonshot, Groq, vLLM, or another /v1/chat/completions-compatible provider.</small>
+        </span>
+      </div>
+
+      {isWarningVisible && (
+        <div className="setup-message is-warning">
+          <AlertTriangle size={18} />
+          <span>
+            External API privacy warning
+            <small>
+              Using an external API sends your chat messages and retrieved document context
+              to a third-party server. This is not a fully local workflow.
+            </small>
+          </span>
+          <button
+            className="setup-message-dismiss"
+            type="button"
+            aria-label="Dismiss privacy warning"
+            onClick={() => setIsWarningVisible(false)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <div className="settings-field-grid">
+        <label className="settings-field">
+          <span>
+            <strong>Endpoint URL</strong>
+            <small>Base URL for an OpenAI-compatible API, usually ending in /v1.</small>
+          </span>
+          <input
+            type="url"
+            value={endpoint}
+            placeholder={DEFAULT_OPENAI_COMPATIBLE_ENDPOINT}
+            aria-invalid={!isEndpointValid}
+            onChange={(event) => onEndpointChange(event.target.value)}
+          />
+        </label>
+
+        {!isEndpointValid && (
+          <div className="setup-message is-error">
+            <AlertCircle size={18} />
+            <span>
+              Endpoint must be an http(s) URL.
+              <small>Use a base URL such as https://api.openai.com/v1 or http://localhost:8000/v1.</small>
+            </span>
+          </div>
+        )}
+
+        <label className="settings-field">
+          <span>
+            <strong>Model name</strong>
+            <small>Enter the exact model identifier expected by the provider.</small>
+          </span>
+          <input
+            type="text"
+            value={selectedModel}
+            placeholder="moonshotai/kimi-k2.6"
+            onChange={(event) => onSelectModel(event.target.value)}
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>
+            <strong>API key</strong>
+            <small>Stored in this browser only and sent to the backend per request.</small>
+          </span>
+          <input
+            type="password"
+            value={apiKey}
+            placeholder="sk-..."
+            autoComplete="off"
+            onChange={(event) => onApiKeyChange(event.target.value)}
+          />
+        </label>
+      </div>
+    </section>
   );
 }
 
