@@ -95,13 +95,14 @@ function parseSseMessage(rawMessage) {
 export async function streamChatResponse({
   message,
   conversationId,
-  context,
+  onContext,
   onToken,
   onDone,
   onError,
   signal,
 }) {
   const llmSetup = readSavedLlmSetup();
+  const embeddingSetup = readSavedEmbeddingSetup();
   const response = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -110,7 +111,7 @@ export async function streamChatResponse({
       message,
       conversationId,
       model: llmSetup?.model,
-      context,
+      embeddingModel: embeddingSetup?.model,
     }),
   });
 
@@ -143,6 +144,8 @@ export async function streamChatResponse({
 
       if (event === 'token') {
         onToken?.(data.content ?? '');
+      } else if (event === 'context') {
+        onContext?.(data);
       } else if (event === 'done') {
         onDone?.(data);
       } else if (event === 'error') {
@@ -157,6 +160,8 @@ export async function streamChatResponse({
     const { event, data } = parseSseMessage(buffer);
     if (event === 'done') {
       onDone?.(data);
+    } else if (event === 'context') {
+      onContext?.(data);
     }
   }
 }

@@ -42,8 +42,8 @@ export default function SearchPanel({ isOpen, chunks, status, onClose }) {
               <span>{formatScore(chunk.score)}</span>
             </div>
             <p>
-              {chunk.content
-                ? `${chunk.content.slice(0, 260)}${chunk.content.length > 260 ? '...' : ''}`
+              {chunk.preview || chunk.content
+                ? (chunk.preview ?? `${chunk.content.slice(0, 260)}${chunk.content.length > 260 ? '...' : ''}`)
                 : 'No preview available.'}
             </p>
             <small>Chunk {chunk.chunkIndex != null ? chunk.chunkIndex + 1 : 'unknown'}</small>

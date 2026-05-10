@@ -1,8 +1,18 @@
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
 
-const MAX_CONTEXT_CHUNKS = 6;
-const MAX_CONTEXT_CHARS = 9000;
-const MAX_CHUNK_CHARS = 1800;
+const MAX_CONTEXT_CHUNKS = 3;
+const MAX_CONTEXT_CHARS = 3500;
+const MAX_CHUNK_CHARS = 1000;
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? '30m';
+
+function readNumberEnv(name, fallback) {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+const OLLAMA_NUM_CTX = readNumberEnv('OLLAMA_NUM_CTX', 4096);
+const OLLAMA_NUM_PREDICT = readNumberEnv('OLLAMA_NUM_PREDICT', 384);
+const OLLAMA_TEMPERATURE = readNumberEnv('OLLAMA_TEMPERATURE', 0.2);
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -71,6 +81,12 @@ export async function* streamOllamaChat({ model, messages }) {
       model,
       messages,
       stream: true,
+      keep_alive: OLLAMA_KEEP_ALIVE,
+      options: {
+        num_ctx: OLLAMA_NUM_CTX,
+        num_predict: OLLAMA_NUM_PREDICT,
+        temperature: OLLAMA_TEMPERATURE,
+      },
     }),
   });
 
@@ -100,6 +116,18 @@ export async function* streamOllamaChat({ model, messages }) {
 
       if (content) {
         yield content;
+      } else if (payload.done) {
+        yield {
+          type: 'stats',
+          stats: {
+            totalDuration: payload.total_duration,
+            loadDuration: payload.load_duration,
+            promptEvalCount: payload.prompt_eval_count,
+            promptEvalDuration: payload.prompt_eval_duration,
+            evalCount: payload.eval_count,
+            evalDuration: payload.eval_duration,
+          },
+        };
       }
     }
   }
@@ -111,6 +139,18 @@ export async function* streamOllamaChat({ model, messages }) {
 
     if (content) {
       yield content;
+    } else if (payload.done) {
+      yield {
+        type: 'stats',
+        stats: {
+          totalDuration: payload.total_duration,
+          loadDuration: payload.load_duration,
+          promptEvalCount: payload.prompt_eval_count,
+          promptEvalDuration: payload.prompt_eval_duration,
+          evalCount: payload.eval_count,
+          evalDuration: payload.eval_duration,
+        },
+      };
     }
   }
 }

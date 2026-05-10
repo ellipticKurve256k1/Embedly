@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { searchQuery, streamChatResponse } from '../lib/api.js';
+import { streamChatResponse } from '../lib/api.js';
 import ChatInput from './ChatInput.jsx';
 import MessageList from './MessageList.jsx';
 import SearchPanel from './SearchPanel.jsx';
@@ -47,47 +47,37 @@ export default function ChatPanel() {
     setInputValue('');
     setChatError('');
     setContextStatus({ type: 'info', message: 'Retrieving relevant chunks...' });
-    setIsSearchPanelOpen(false);
+    setIsSearchPanelOpen(true);
     setRetrievedChunks([]);
-    setMessages((currentMessages) => [...currentMessages, userMessage]);
+    setMessages((currentMessages) => [...currentMessages, userMessage, assistantMessage]);
     setIsSearching(true);
-
-    let chunks = [];
-
-    try {
-      const payload = await searchQuery(messageText);
-      chunks = payload.results ?? [];
-      setRetrievedChunks(chunks);
-
-      if (chunks.length > 0) {
-        setIsSearchPanelOpen(true);
-        setContextStatus(null);
-      } else {
-        setIsSearchPanelOpen(true);
-        setContextStatus({
-          type: 'warning',
-          message: 'No matching chunks were found. The answer will not have document context.',
-        });
-      }
-    } catch (error) {
-      setIsSearchPanelOpen(true);
-      setContextStatus({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Context retrieval failed.',
-      });
-    } finally {
-      setIsSearching(false);
-    }
-
-    setMessages((currentMessages) => [...currentMessages, assistantMessage]);
     setIsStreaming(true);
 
     try {
       await streamChatResponse({
         message: messageText,
         conversationId,
-        context: { chunks },
         signal: abortController.signal,
+        onContext: (payload) => {
+          const chunks = payload?.chunks ?? [];
+          setRetrievedChunks(chunks);
+          setIsSearchPanelOpen(true);
+          setIsSearching(false);
+
+          if (payload?.error) {
+            setContextStatus({
+              type: 'error',
+              message: payload.error,
+            });
+          } else if (chunks.length > 0) {
+            setContextStatus(null);
+          } else {
+            setContextStatus({
+              type: 'warning',
+              message: 'No matching chunks were found. The answer will not have document context.',
+            });
+          }
+        },
         onToken: (content) => {
           updateAssistantMessage(assistantMessage.id, (message) => ({
             ...message,
@@ -109,6 +99,7 @@ export default function ChatPanel() {
       if (error.name === 'AbortError') return;
 
       const errorMessage = error instanceof Error ? error.message : 'Chat generation failed.';
+      setIsSearching(false);
       setChatError(errorMessage);
       updateAssistantMessage(assistantMessage.id, (message) => ({
         ...message,
@@ -117,6 +108,7 @@ export default function ChatPanel() {
         isError: true,
       }));
     } finally {
+      setIsSearching(false);
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
