@@ -29,6 +29,21 @@ function saveConversationTurn(conversationId, message, assistantContent) {
   conversations.set(conversationId, nextHistory);
 }
 
+function computeAverageScore(chunkList) {
+  if (chunkList.length === 0) return 0;
+  return chunkList.reduce((sum, chunk) => sum + chunk.score, 0) / chunkList.length;
+}
+
+function selectBetterChunks(originalChunks, rewrittenChunks) {
+  if (rewrittenChunks.length === 0) return originalChunks;
+  if (originalChunks.length === 0) return rewrittenChunks;
+
+  const originalScore = computeAverageScore(originalChunks);
+  const rewrittenScore = computeAverageScore(rewrittenChunks);
+
+  return rewrittenScore > originalScore ? rewrittenChunks : originalChunks;
+}
+
 router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
   const model = String(request.body?.model ?? '').trim();
@@ -69,43 +84,102 @@ router.post('/', async (request, response) => {
 
     if (history.length > 0) {
       const rewriteStartedAt = performance.now();
+
       try {
-        retrievalQuery = await rewriteRetrievalQuery({ model, message, history });
-        rewriteUsed = retrievalQuery !== message;
+        // Run retrieval with ORIGINAL query AND rewrite in parallel
+        const originalRetrieval = retrieveChunks(message, {
+          model: embeddingModel,
+          limit: CHAT_RETRIEVAL_LIMIT,
+        });
+        const rewritePromise = rewriteRetrievalQuery({ model, message, history });
+
+        const [originalChunksResult, rewrittenQuery] = await Promise.allSettled([
+          originalRetrieval,
+          rewritePromise,
+        ]);
+
+        rewriteMs = Math.round(performance.now() - rewriteStartedAt);
+
+        const originalChunks = originalChunksResult.status === 'fulfilled'
+          ? originalChunksResult.value
+          : [];
+
+        const validRewrittenQuery = rewrittenQuery.status === 'fulfilled'
+          ? rewrittenQuery.value
+          : message;
+
+        rewriteFailed = rewrittenQuery.status === 'rejected';
+
+        if (rewriteFailed) {
+          console.warn('query rewrite failed', {
+            error: rewrittenQuery.reason instanceof Error
+              ? rewrittenQuery.reason.message
+              : String(rewrittenQuery.reason),
+            originalQuery: message,
+          });
+        }
+
+        // If rewrite produced different query, re-retrieve and select best chunks
+        if (validRewrittenQuery !== message) {
+          const rewrittenChunks = await retrieveChunks(validRewrittenQuery, {
+            model: embeddingModel,
+            limit: CHAT_RETRIEVAL_LIMIT,
+          });
+          chunks = selectBetterChunks(originalChunks, rewrittenChunks);
+          retrievalQuery = validRewrittenQuery;
+          rewriteUsed = true;
+        } else {
+          chunks = originalChunks;
+          retrievalQuery = message;
+        }
       } catch (error) {
+        // Fallback: use original message if parallel execution fails entirely
         rewriteFailed = true;
         retrievalQuery = message;
-        console.warn('query rewrite failed', {
+        rewriteMs = Math.round(performance.now() - rewriteStartedAt);
+        console.warn('parallel rewrite/retrieval failed', {
           error: error instanceof Error ? error.message : String(error),
           originalQuery: message,
         });
+      }
+    } else {
+      // No history: simple direct retrieval
+      const retrievalStartedAt = performance.now();
+      try {
+        chunks = await retrieveChunks(message, {
+          model: embeddingModel,
+          limit: CHAT_RETRIEVAL_LIMIT,
+        });
+      } catch (error) {
+        writeSse(response, 'context', {
+          originalQuery: message,
+          rewrittenQuery: message,
+          wasRewritten: false,
+          chunks: [],
+          error: error instanceof Error ? error.message : 'Context retrieval failed.',
+        });
+        response.end();
+        return;
       } finally {
-        rewriteMs = Math.round(performance.now() - rewriteStartedAt);
+        retrievalMs = Math.round(performance.now() - retrievalStartedAt);
       }
     }
 
-    const retrievalStartedAt = performance.now();
-    try {
-      chunks = await retrieveChunks(retrievalQuery, {
-        model: embeddingModel,
-        limit: CHAT_RETRIEVAL_LIMIT,
-      });
+    // Send context event (for non-first-message cases, we already have chunks)
+    if (history.length === 0) {
       writeSse(response, 'context', {
         originalQuery: message,
         rewrittenQuery: retrievalQuery,
-        wasRewritten: retrievalQuery !== message,
+        wasRewritten: false,
         chunks: chunks.map(toContextChunk),
       });
-    } catch (error) {
+    } else {
       writeSse(response, 'context', {
         originalQuery: message,
         rewrittenQuery: retrievalQuery,
-        wasRewritten: retrievalQuery !== message,
-        chunks: [],
-        error: error instanceof Error ? error.message : 'Context retrieval failed.',
+        wasRewritten: rewriteUsed,
+        chunks: chunks.map(toContextChunk),
       });
-    } finally {
-      retrievalMs = Math.round(performance.now() - retrievalStartedAt);
     }
 
     const messages = buildChatMessages({ message, history, chunks });
