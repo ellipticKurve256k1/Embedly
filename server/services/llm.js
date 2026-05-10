@@ -3,6 +3,10 @@ const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434';
 const MAX_CONTEXT_CHUNKS = 3;
 const MAX_CONTEXT_CHARS = 3500;
 const MAX_CHUNK_CHARS = 1000;
+const MAX_REWRITE_HISTORY_MESSAGES = 6;
+const MAX_REWRITE_HISTORY_CHARS = 2200;
+const MAX_REWRITE_USER_MESSAGE_CHARS = 300;
+const MAX_REWRITE_ASSISTANT_MESSAGE_CHARS = 150;
 const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? '30m';
 
 function readNumberEnv(name, fallback) {
@@ -13,6 +17,7 @@ function readNumberEnv(name, fallback) {
 const OLLAMA_NUM_CTX = readNumberEnv('OLLAMA_NUM_CTX', 4096);
 const OLLAMA_NUM_PREDICT = readNumberEnv('OLLAMA_NUM_PREDICT', 384);
 const OLLAMA_TEMPERATURE = readNumberEnv('OLLAMA_TEMPERATURE', 0.2);
+const OLLAMA_REWRITE_TIMEOUT_MS = readNumberEnv('OLLAMA_REWRITE_TIMEOUT_MS', 5000);
 
 function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -20,6 +25,76 @@ function cleanText(value) {
 
 function formatScore(score) {
   return typeof score === 'number' ? score.toFixed(3) : 'unknown';
+}
+
+function createTimeoutSignal(timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeout),
+  };
+}
+
+function formatRewriteHistory(history = []) {
+  const recentHistory = history.slice(-MAX_REWRITE_HISTORY_MESSAGES);
+  const formattedLines = [];
+
+  for (const message of recentHistory) {
+    const role = message.role === 'assistant' ? 'Assistant' : 'User';
+    const content = cleanText(message.content);
+
+    if (!content) continue;
+
+    const maxChars = message.role === 'user'
+      ? MAX_REWRITE_USER_MESSAGE_CHARS
+      : MAX_REWRITE_ASSISTANT_MESSAGE_CHARS;
+
+    const clippedContent = content.slice(0, maxChars);
+    formattedLines.push(`${role}: ${clippedContent}`);
+  }
+
+  return formattedLines.join('\n');
+}
+
+function cleanRewriteResponse(value) {
+  return cleanText(value)
+    .replace(/^["'`]+|"['`]+$/g, '')
+    .replace(/^standalone search query:\s*/i, '')
+    .replace(/^search query:\s*/i, '')
+    .trim();
+}
+
+function isValidRetrievalQuery(query) {
+  if (!query || query.length < 3) {
+    return false;
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const invalidPrefixes = [
+    'i ',
+    "i'm ",
+    'i am ',
+    'the ',
+    'based on ',
+    'according to ',
+    'as an ',
+    'as a ',
+    'sorry',
+    'i apologize',
+    'i cannot',
+    "i can't",
+    'i do not',
+    "i don't",
+    'i would',
+    'i will',
+    'let me',
+    'here is',
+    'here are',
+  ];
+
+  return !invalidPrefixes.some((prefix) => lowerQuery.startsWith(prefix));
 }
 
 function buildContextBlock(chunks = []) {
@@ -75,6 +150,80 @@ export function buildChatMessages({ message, history = [], chunks = [] }) {
     ...history,
     { role: 'user', content: message },
   ];
+}
+
+export async function rewriteRetrievalQuery({ model, message, history = [] }) {
+  const userMessage = cleanText(message);
+
+  if (!userMessage || history.length === 0) {
+    return userMessage;
+  }
+
+  const recentConversation = formatRewriteHistory(history);
+  if (!recentConversation) {
+    return userMessage;
+  }
+
+  const messages = [
+    {
+      role: 'system',
+      content: [
+        'You rewrite chat follow-up questions into standalone document search queries.',
+        'Use the recent conversation only to resolve references.',
+        'Do not answer the question.',
+        'Do not add facts that are not present in the conversation.',
+        'Return only one concise search query.',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        'Recent conversation:',
+        recentConversation,
+        '',
+        `User question: ${userMessage}`,
+        '',
+        'Standalone search query:',
+      ].join('\n'),
+    },
+  ];
+
+  const timeout = createTimeoutSignal(OLLAMA_REWRITE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: timeout.signal,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        options: {
+          num_ctx: Math.min(OLLAMA_NUM_CTX, 2048),
+          num_predict: 64,
+          temperature: 0,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Ollama rewrite failed (${response.status}): ${body || response.statusText}`);
+    }
+
+    const payload = await response.json();
+    const rewrittenQuery = cleanRewriteResponse(payload.message?.content);
+
+    if (!isValidRetrievalQuery(rewrittenQuery)) {
+      return userMessage;
+    }
+
+    return rewrittenQuery;
+  } finally {
+    timeout.clear();
+  }
 }
 
 export async function* streamOllamaChat({ model, messages }) {

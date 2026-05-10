@@ -127,6 +127,42 @@
   background: rgba(210, 83, 100, 0.1);
 }
 
+.sources-panel__query {
+  margin: 0 20px 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(132, 146, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(247, 250, 255, 0.82);
+}
+
+.sources-panel__query span {
+  display: block;
+  margin-bottom: 5px;
+  color: #8c96ad;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sources-panel__query p {
+  margin: 0;
+  color: #3b4562;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sources-panel__original {
+  display: block;
+  margin-top: 8px;
+  color: #8c96ad;
+  font-size: 12px;
+  font-weight: 500;
+  font-style: italic;
+}
+
 .sources-panel__list {
   flex: 1;
   min-height: 0;

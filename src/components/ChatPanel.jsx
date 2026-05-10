@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { streamChatResponse } from '../lib/api.js';
 import ChatInput from './ChatInput.jsx';
 import MessageList from './MessageList.jsx';
@@ -20,12 +21,30 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [retrievedChunks, setRetrievedChunks] = useState([]);
+  const [retrievalQuery, setRetrievalQuery] = useState('');
+  const [originalQuery, setOriginalQuery] = useState('');
+  const [wasRewritten, setWasRewritten] = useState(false);
   const [sourcesCollapsed, setSourcesCollapsed] = useState(true);
   const [contextStatus, setContextStatus] = useState(null);
   const [chatError, setChatError] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortControllerRef = useRef(null);
+
+  const resetConversation = useCallback(() => {
+    abortControllerRef.current?.abort();
+    setMessages([]);
+    setConversationId(null);
+    setRetrievedChunks([]);
+    setRetrievalQuery('');
+    setOriginalQuery('');
+    setWasRewritten(false);
+    setSourcesCollapsed(true);
+    setContextStatus(null);
+    setChatError('');
+    setIsSearching(false);
+    setIsStreaming(false);
+  }, []);
 
   const updateAssistantMessage = useCallback((messageId, updater) => {
     setMessages((currentMessages) => currentMessages.map((message) => (
@@ -48,6 +67,7 @@ export default function ChatPanel() {
     setChatError('');
     setContextStatus({ type: 'info', message: 'Retrieving relevant chunks...' });
     setRetrievedChunks([]);
+    setRetrievalQuery('');
     setMessages((currentMessages) => [...currentMessages, userMessage, assistantMessage]);
     setIsSearching(true);
     setIsStreaming(true);
@@ -60,6 +80,9 @@ export default function ChatPanel() {
         onContext: (payload) => {
           const chunks = payload?.chunks ?? [];
           setRetrievedChunks(chunks);
+          setRetrievalQuery(payload?.rewrittenQuery ?? '');
+          setOriginalQuery(payload?.originalQuery ?? '');
+          setWasRewritten(payload?.wasRewritten ?? false);
           setIsSearching(false);
 
           // Auto-expand sources panel when chunks arrive
@@ -130,6 +153,9 @@ export default function ChatPanel() {
         <SourcesPanel
           isOpen={!sourcesCollapsed}
           chunks={retrievedChunks}
+          retrievalQuery={retrievalQuery}
+          originalQuery={originalQuery}
+          wasRewritten={wasRewritten}
           status={contextStatus}
           onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
         />
@@ -142,6 +168,17 @@ export default function ChatPanel() {
       )}
 
       <div className="chat-panel__footer">
+        {messages.length > 0 && (
+          <button
+            className="chat-panel__new-btn"
+            type="button"
+            onClick={resetConversation}
+            disabled={isStreaming}
+            aria-label="Start new conversation"
+          >
+            <Plus size={18} />
+          </button>
+        )}
         <ChatInput
           value={inputValue}
           disabled={isStreaming}

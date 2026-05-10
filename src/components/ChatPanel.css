@@ -17,7 +17,34 @@
 
 .chat-panel__footer {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 14px clamp(0px, 2vw, 20px) 0;
+}
+
+.chat-panel__new-btn {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(132, 146, 184, 0.2);
+  border-radius: 12px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.96);
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.chat-panel__new-btn:hover:not(:disabled) {
+  color: #6258ff;
+  border-color: rgba(98, 88, 255, 0.3);
+}
+
+.chat-panel__new-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .chat-panel__error {

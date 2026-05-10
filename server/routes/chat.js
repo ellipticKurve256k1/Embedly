@@ -1,7 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_EMBEDDING_MODEL } from '../services/embedder.js';
-import { buildChatMessages, streamOllamaChat } from '../services/llm.js';
+import { buildChatMessages, rewriteRetrievalQuery, streamOllamaChat } from '../services/llm.js';
 import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
 
 const router = express.Router();
@@ -33,7 +33,10 @@ router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
   const model = String(request.body?.model ?? '').trim();
   const embeddingModel = String(request.body?.embeddingModel || DEFAULT_EMBEDDING_MODEL).trim();
-  const conversationId = String(request.body?.conversationId ?? '').trim() || uuidv4();
+  const rawConversationId = request.body?.conversationId;
+  const conversationId = (typeof rawConversationId === 'string' && rawConversationId.trim())
+    ? rawConversationId.trim()
+    : uuidv4();
 
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -55,24 +58,58 @@ router.post('/', async (request, response) => {
   }
 
   try {
+    const startedAt = performance.now();
+    const history = getConversationHistory(conversationId);
     let chunks = [];
+    let retrievalQuery = message;
+    let rewriteUsed = false;
+    let rewriteFailed = false;
+    let rewriteMs = null;
+    let retrievalMs = null;
+
+    if (history.length > 0) {
+      const rewriteStartedAt = performance.now();
+      try {
+        retrievalQuery = await rewriteRetrievalQuery({ model, message, history });
+        rewriteUsed = retrievalQuery !== message;
+      } catch (error) {
+        rewriteFailed = true;
+        retrievalQuery = message;
+        console.warn('query rewrite failed', {
+          error: error instanceof Error ? error.message : String(error),
+          originalQuery: message,
+        });
+      } finally {
+        rewriteMs = Math.round(performance.now() - rewriteStartedAt);
+      }
+    }
+
+    const retrievalStartedAt = performance.now();
     try {
-      chunks = await retrieveChunks(message, {
+      chunks = await retrieveChunks(retrievalQuery, {
         model: embeddingModel,
         limit: CHAT_RETRIEVAL_LIMIT,
       });
-      writeSse(response, 'context', { chunks: chunks.map(toContextChunk) });
+      writeSse(response, 'context', {
+        originalQuery: message,
+        rewrittenQuery: retrievalQuery,
+        wasRewritten: retrievalQuery !== message,
+        chunks: chunks.map(toContextChunk),
+      });
     } catch (error) {
       writeSse(response, 'context', {
+        originalQuery: message,
+        rewrittenQuery: retrievalQuery,
+        wasRewritten: retrievalQuery !== message,
         chunks: [],
         error: error instanceof Error ? error.message : 'Context retrieval failed.',
       });
+    } finally {
+      retrievalMs = Math.round(performance.now() - retrievalStartedAt);
     }
 
-    const history = getConversationHistory(conversationId);
     const messages = buildChatMessages({ message, history, chunks });
     let assistantContent = '';
-    const startedAt = performance.now();
     let firstTokenAt = null;
     let ollamaStats = null;
 
@@ -94,6 +131,10 @@ router.post('/', async (request, response) => {
       model,
       chunkCount: chunks.length,
       historyMessages: history.length,
+      rewriteUsed,
+      rewriteFailed,
+      rewriteMs,
+      retrievalMs,
       firstTokenMs: firstTokenAt ? Math.round(firstTokenAt - startedAt) : null,
       totalMs: Math.round(performance.now() - startedAt),
       promptEvalCount: ollamaStats?.promptEvalCount,

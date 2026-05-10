@@ -6,7 +6,7 @@ function formatScore(score) {
   return `${Math.round(score * 100)}%`;
 }
 
-export default function SourcesPanel({ isOpen, chunks, status, onClose }) {
+export default function SourcesPanel({ isOpen, chunks, retrievalQuery, originalQuery, wasRewritten, status, onClose }) {
   return (
     <aside className={`sources-panel${isOpen ? ' is-open' : ''}`} aria-label="Retrieved context">
       {isOpen ? (
@@ -32,6 +32,16 @@ export default function SourcesPanel({ isOpen, chunks, status, onClose }) {
           {status && (
             <div className={`sources-panel__status sources-panel__status--${status.type}`}>
               {status.message}
+            </div>
+          )}
+
+          {retrievalQuery && (
+            <div className="sources-panel__query">
+              <span>{wasRewritten ? 'Rewritten query' : 'Searched for'}</span>
+              <p>{retrievalQuery}</p>
+              {wasRewritten && originalQuery && (
+                <small className="sources-panel__original">Original: "{originalQuery}"</small>
+              )}
             </div>
           )}
 
