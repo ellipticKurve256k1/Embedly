@@ -47,9 +47,9 @@ input {
   height: 100%;
   overflow: auto;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: clamp(14px, 2vh, 24px);
-  padding: clamp(20px, 3vw, 38px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(10px, 1.4vh, 16px);
+  padding: clamp(12px, 1.8vw, 24px);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.92)),
     #ffffff;
@@ -58,14 +58,15 @@ input {
 .topbar {
   position: relative;
   z-index: 2;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  gap: clamp(12px, 1.8vw, 22px);
+  min-width: 0;
 }
 
 .brand-logo {
-  width: clamp(132px, 14vw, 190px);
+  width: clamp(116px, 10vw, 152px);
   height: auto;
   display: block;
 }
@@ -76,8 +77,8 @@ input {
 }
 
 .icon-button {
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
@@ -116,8 +117,9 @@ input {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-left: auto;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
 }
 
 .sr-only {
@@ -133,12 +135,24 @@ input {
 
 @media (max-width: 680px) {
   .landing-shell {
+    gap: 12px;
+    padding: 14px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
-    padding: 18px;
+  }
+
+  .topbar .mode-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    order: 3;
   }
 
   .brand-logo {
-    width: 132px;
+    width: 118px;
   }
 
   .icon-button {

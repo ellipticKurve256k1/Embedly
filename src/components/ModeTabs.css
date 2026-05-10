@@ -5,15 +5,16 @@
   justify-content: center;
   align-items: center;
   gap: 4px;
-  padding-top: clamp(4px, 1vh, 12px);
+  min-width: 0;
+  padding: 0;
 }
 
 .mode-tab {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
-  min-height: 40px;
+  padding: 0 14px;
+  min-height: 36px;
   border: 0;
   border-radius: 10px;
   color: #8c96ad;
@@ -46,4 +47,18 @@
   height: 2.5px;
   border-radius: 999px;
   background: #6258ff;
+}
+
+@media (max-width: 680px) {
+  .mode-tabs {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .mode-tab {
+    flex: 1;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 10px;
+  }
 }

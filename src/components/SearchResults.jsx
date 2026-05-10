@@ -145,13 +145,6 @@ function ResultPreview({ result, onClose }) {
           <span className="tag-sep">·</span>
           <span>{result.content ? `${result.content.length} chars` : '0 chars'}</span>
         </div>
-        <button
-          className="result-preview-close-btn"
-          type="button"
-          onClick={onClose}
-        >
-          Close preview
-        </button>
       </div>
     </div>
   );

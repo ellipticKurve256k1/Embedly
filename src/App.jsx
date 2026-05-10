@@ -96,6 +96,7 @@ export default function App() {
       <section className="landing-shell" aria-label="Embeddly">
         <header className="topbar">
           <img className="brand-logo" src={logoSrc} alt="Embeddly" />
+          <ModeTabs activeMode={mode} onModeChange={setMode} />
           <div className="topbar-actions">
             <ModelStatusBar
               embeddingSetup={embeddingSetup}
@@ -107,8 +108,6 @@ export default function App() {
             </a>
           </div>
         </header>
-
-        <ModeTabs activeMode={mode} onModeChange={setMode} />
 
         {mode === 'chat' && <ChatPanel />}
 
