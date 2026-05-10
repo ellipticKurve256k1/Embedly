@@ -29,15 +29,18 @@ function StatusBadge({ status, error }) {
   );
 }
 
-function ProgressStatus({ status, progress, chunkCount }) {
-  const total = progress?.totalChunks ?? chunkCount ?? 0;
+function ProgressStatus({ status, progress }) {
+  const total = progress?.totalChunks ?? 0;
   const processed = progress?.processedChunks ?? 0;
   const percent = getProgressPercent(progress);
 
   return (
     <div className="transfer-progress">
       <div className="transfer-progress-meta">
-        <span>{status}</span>
+        <span className="transfer-progress-stage">
+          <LoaderCircle size={12} />
+          <span>{status}</span>
+        </span>
         {total > 0 && <span>{processed}/{total}</span>}
       </div>
       <div
@@ -116,7 +119,7 @@ export default function FileTransferRow({
 
       <div className="transfer-row-meta">
         {!isKnowledge ? null : isActive ? (
-          <ProgressStatus status={displayStatus} progress={progress} chunkCount={document.chunkCount} />
+          <ProgressStatus status={displayStatus} progress={progress} />
         ) : (
           <>
             <StatusBadge status={knowledgeStatus} error={errorMessage} />

@@ -90,6 +90,7 @@
 
 .file-drop-zone.is-loading .file-drop-zone-icon svg,
 .transfer-row.is-uploading svg,
+.transfer-progress-stage svg,
 .embed-primary-button.is-loading svg {
   animation: upload-spin 900ms linear infinite;
 }
@@ -425,6 +426,13 @@
   font-size: 11px;
   font-weight: 850;
   text-transform: capitalize;
+}
+
+.transfer-progress-stage {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .transfer-progress-bar {

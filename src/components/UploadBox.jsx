@@ -37,6 +37,11 @@ function getDisplayStatus(document, embeddingDocumentIds, jobProgress) {
   const progress = jobProgress[document.id];
   const documentStatus = document.status ?? 'pending';
   const progressStage = progress?.stage;
+  const progressStatus = progress?.status;
+
+  if (TERMINAL_JOB_STATUSES.has(documentStatus)) return documentStatus;
+  if (TERMINAL_JOB_STATUSES.has(progressStatus)) return progressStatus;
+  if (TERMINAL_JOB_STATUSES.has(progressStage)) return progressStage;
 
   if (embeddingDocumentIds.has(document.id)) {
     if (ACTIVE_STATUSES.has(progressStage)) return progressStage;
@@ -97,6 +102,10 @@ function saveKnowledgeBaseIds(ids) {
 function areSetsEqual(first, second) {
   if (first.size !== second.size) return false;
   return [...first].every((value) => second.has(value));
+}
+
+function isSettledJob(job) {
+  return TERMINAL_JOB_STATUSES.has(job?.status) || TERMINAL_JOB_STATUSES.has(job?.stage);
 }
 
 export default function UploadBox() {
@@ -180,7 +189,7 @@ export default function UploadBox() {
         setJobProgress(latestByDocumentId);
 
         const settledIds = [...activeDocumentIds].filter((id) => (
-          TERMINAL_JOB_STATUSES.has(latestByDocumentId[id]?.status)
+          isSettledJob(latestByDocumentId[id])
         ));
 
         if (settledIds.length > 0) {
@@ -191,12 +200,15 @@ export default function UploadBox() {
           });
         }
 
-        const allKnownJobsSettled = [...activeDocumentIds].every((id) => (
-          latestByDocumentId[id] && TERMINAL_JOB_STATUSES.has(latestByDocumentId[id].status)
-        ));
-
-        if (allKnownJobsSettled) {
+        if (settledIds.length > 0) {
           await refreshDocuments();
+          setJobProgress((currentProgress) => {
+            const nextProgress = { ...currentProgress };
+            settledIds.forEach((id) => {
+              delete nextProgress[id];
+            });
+            return nextProgress;
+          });
         }
       } catch (error) {
         if (!isCancelled) {
