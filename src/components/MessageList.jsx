@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bot, FileText, LoaderCircle, UserRound } from 'lucide-react';
 import './MessageList.css';
 
@@ -79,6 +79,19 @@ function MessageContent({ content, sourceChunks }) {
 }
 
 export default function MessageList({ messages, isSearching }) {
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      const listElement = listRef.current;
+      if (listElement) {
+        listElement.scrollTop = listElement.scrollHeight;
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [messages, isSearching]);
+
   if (messages.length === 0) {
     return (
       <div className="message-list message-list--empty">
@@ -96,7 +109,7 @@ export default function MessageList({ messages, isSearching }) {
   }
 
   return (
-    <div className="message-list">
+    <div className="message-list" ref={listRef}>
       <div className="message-list__items">
         {messages.map((message) => {
           const isAssistant = message.role === 'assistant';
@@ -144,6 +157,7 @@ export default function MessageList({ messages, isSearching }) {
             Retrieving context
           </div>
         )}
+        <div className="message-list__bottom" aria-hidden="true" />
       </div>
     </div>
   );
