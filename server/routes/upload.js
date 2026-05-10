@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { insertDocument, nowIso, toPublicDocument, UPLOAD_DIR } from '../db.js';
+import { normalizeFilename } from '../lib/filename.js';
 
 const router = express.Router();
 
@@ -45,7 +46,7 @@ router.post('/', upload.array('files'), (request, response) => {
     const id = uuidv4();
     const document = {
       id,
-      filename: file.originalname,
+      filename: normalizeFilename(file.originalname),
       storedFilename: file.filename,
       mimeType: file.mimetype,
       sizeBytes: file.size,

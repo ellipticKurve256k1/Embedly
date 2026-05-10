@@ -7,6 +7,7 @@
     "dev": "vite",
     "server": "node server/index.js",
     "build": "vite build",
+    "test:filename": "node --test server/lib/filename.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
