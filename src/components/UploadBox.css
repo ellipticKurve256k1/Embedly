@@ -90,8 +90,7 @@
 
 .file-drop-zone.is-loading .file-drop-zone-icon svg,
 .transfer-row.is-uploading svg,
-.transfer-disabled-reason.is-active svg,
-.embed-primary-button svg {
+.embed-primary-button.is-loading svg {
   animation: upload-spin 900ms linear infinite;
 }
 
@@ -161,7 +160,7 @@
   overflow: hidden;
 }
 
-.transfer-pane.is-queue {
+.transfer-pane.is-knowledge {
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -289,7 +288,7 @@
   min-width: 0;
   min-height: 62px;
   display: grid;
-  grid-template-columns: 28px minmax(160px, 1fr) minmax(120px, 0.66fr) 34px;
+  grid-template-columns: 28px minmax(160px, 1fr) minmax(120px, 0.66fr) minmax(34px, auto);
   align-items: center;
   gap: 10px;
   padding: 9px 10px;
@@ -367,8 +366,6 @@
 }
 
 .transfer-status-badge,
-.transfer-impact-badge,
-.transfer-disabled-reason,
 .transfer-chunk-count {
   min-height: 24px;
   display: inline-flex;
@@ -399,22 +396,13 @@
   background: rgba(210, 83, 100, 0.12);
 }
 
+.transfer-status-badge.is-queued,
 .transfer-status-badge.is-embedding,
 .transfer-status-badge.is-parsing,
 .transfer-status-badge.is-chunking,
 .transfer-status-badge.is-indexing {
   color: #6258ff;
   background: rgba(107, 92, 255, 0.12);
-}
-
-.transfer-impact-badge {
-  color: #6258ff;
-  background: rgba(107, 92, 255, 0.12);
-}
-
-.transfer-disabled-reason {
-  color: #8c96ad;
-  background: rgba(132, 146, 184, 0.1);
 }
 
 .transfer-chunk-count {
@@ -471,26 +459,65 @@
   }
 }
 
+.transfer-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.transfer-row-action,
 .transfer-row-remove {
-  width: 32px;
   height: 32px;
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 10px;
-  color: #8c96ad;
-  background: transparent;
   cursor: pointer;
   transition:
     color 160ms ease,
     background 160ms ease,
-    transform 160ms ease;
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 
+.transfer-row-action {
+  grid-auto-flow: column;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7368ff, #5144f1);
+  box-shadow: 0 8px 16px rgba(78, 65, 240, 0.16);
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.transfer-row-action:disabled {
+  color: #9aa4b8;
+  background: rgba(132, 146, 184, 0.16);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.transfer-row-remove {
+  width: 32px;
+  border-radius: 10px;
+  color: #8c96ad;
+  background: transparent;
+}
+
+.transfer-row-action:hover:not(:disabled),
 .transfer-row-remove:hover {
   color: #9f4452;
   background: rgba(210, 83, 100, 0.12);
   transform: translateY(-1px);
+}
+
+.transfer-row-action:hover:not(:disabled) {
+  color: #ffffff;
+  background: linear-gradient(135deg, #6258ff, #574cff);
 }
 
 .file-type-icon {
@@ -688,7 +715,7 @@
     grid-row: 2;
   }
 
-  .transfer-pane.is-queue {
+  .transfer-pane.is-knowledge {
     grid-column: 2;
     grid-row: 2;
   }
@@ -705,7 +732,7 @@
 
   .transfer-pane,
   .transfer-pane.is-available,
-  .transfer-pane.is-queue,
+  .transfer-pane.is-knowledge,
   .transfer-controls {
     grid-column: 1;
     grid-row: auto;
@@ -729,9 +756,13 @@
     justify-content: flex-start;
   }
 
-  .transfer-row-remove {
+  .transfer-row-actions {
     grid-column: 3;
     grid-row: 1;
+  }
+
+  .transfer-row-action span {
+    display: none;
   }
 }
 

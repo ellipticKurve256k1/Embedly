@@ -23,6 +23,7 @@ const ACCEPTED_TYPES = {
 const ACCEPTED_EXTENSIONS = ['pdf', 'txt', 'md', 'csv'];
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed']);
+const KNOWLEDGE_BASE_IDS_STORAGE_KEY = 'embeddly.knowledgeBaseIds';
 
 function isAcceptedFile(file) {
   const mimeType = file.type;
@@ -59,8 +60,12 @@ function getStatusGroup(displayStatus) {
   return 'pending';
 }
 
-function isEmbeddable(view) {
+function canReturnToAvailable(view) {
   return view.statusGroup === 'pending' || view.statusGroup === 'failed';
+}
+
+function shouldAutoKeepInKnowledgeBase(view) {
+  return view.statusGroup === 'completed' || view.statusGroup === 'embedding';
 }
 
 function formatFileList(files) {
@@ -71,6 +76,29 @@ function formatFileList(files) {
   }));
 }
 
+function readSavedKnowledgeBaseIds() {
+  try {
+    const rawIds = window.localStorage.getItem(KNOWLEDGE_BASE_IDS_STORAGE_KEY);
+    const parsedIds = rawIds ? JSON.parse(rawIds) : [];
+    return new Set(Array.isArray(parsedIds) ? parsedIds.filter(Boolean) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveKnowledgeBaseIds(ids) {
+  try {
+    window.localStorage.setItem(KNOWLEDGE_BASE_IDS_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Local storage can be unavailable in restricted browser modes; pane state still works in memory.
+  }
+}
+
+function areSetsEqual(first, second) {
+  if (first.size !== second.size) return false;
+  return [...first].every((value) => second.has(value));
+}
+
 export default function UploadBox() {
   const [documents, setDocuments] = useState([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
@@ -78,8 +106,10 @@ export default function UploadBox() {
   const [isUploading, setIsUploading] = useState(false);
   const [leftSearch, setLeftSearch] = useState('');
   const [debouncedLeftSearch, setDebouncedLeftSearch] = useState('');
+  const [rightSearch, setRightSearch] = useState('');
+  const [debouncedRightSearch, setDebouncedRightSearch] = useState('');
   const [leftSelection, setLeftSelection] = useState(() => new Set());
-  const [rightPaneIds, setRightPaneIds] = useState(() => new Set());
+  const [knowledgeBaseIds, setKnowledgeBaseIds] = useState(readSavedKnowledgeBaseIds);
   const [rightSelection, setRightSelection] = useState(() => new Set());
   const [embeddingDocumentIds, setEmbeddingDocumentIds] = useState(() => new Set());
   const [jobProgress, setJobProgress] = useState({});
@@ -107,6 +137,18 @@ export default function UploadBox() {
 
     return () => window.clearTimeout(timeoutId);
   }, [leftSearch]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedRightSearch(rightSearch.trim().toLowerCase());
+    }, 200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [rightSearch]);
+
+  useEffect(() => {
+    saveKnowledgeBaseIds(knowledgeBaseIds);
+  }, [knowledgeBaseIds]);
 
   useEffect(() => {
     const activeDocumentIds = new Set([
@@ -187,22 +229,28 @@ export default function UploadBox() {
 
   useEffect(() => {
     const existingIds = new Set(documentViews.map((view) => view.document.id));
-    const eligibleIds = new Set(documentViews.filter(isEmbeddable).map((view) => view.document.id));
+    const autoKnowledgeBaseIds = documentViews
+      .filter(shouldAutoKeepInKnowledgeBase)
+      .map((view) => view.document.id);
+    const returnableIds = new Set(documentViews.filter(canReturnToAvailable).map((view) => view.document.id));
 
     setLeftSelection((currentIds) => (
       new Set([...currentIds].filter((id) => existingIds.has(id)))
     ));
-    setRightPaneIds((currentIds) => (
-      new Set([...currentIds].filter((id) => existingIds.has(id) && eligibleIds.has(id)))
-    ));
+    setKnowledgeBaseIds((currentIds) => {
+      const nextIds = new Set([...currentIds].filter((id) => existingIds.has(id)));
+      autoKnowledgeBaseIds.forEach((id) => nextIds.add(id));
+
+      return areSetsEqual(currentIds, nextIds) ? currentIds : nextIds;
+    });
     setRightSelection((currentIds) => (
-      new Set([...currentIds].filter((id) => existingIds.has(id)))
+      new Set([...currentIds].filter((id) => existingIds.has(id) && returnableIds.has(id)))
     ));
   }, [documentViews]);
 
   const leftViews = useMemo(() => (
-    documentViews.filter((view) => !rightPaneIds.has(view.document.id))
-  ), [documentViews, rightPaneIds]);
+    documentViews.filter((view) => !knowledgeBaseIds.has(view.document.id))
+  ), [documentViews, knowledgeBaseIds]);
 
   const visibleLeftViews = useMemo(() => {
     const searchedViews = leftViews.filter(({ document }) => (
@@ -218,34 +266,49 @@ export default function UploadBox() {
 
   const rightViews = useMemo(() => (
     documentViews
-      .filter((view) => rightPaneIds.has(view.document.id))
+      .filter((view) => knowledgeBaseIds.has(view.document.id))
       .sort((a, b) => a.document.filename.localeCompare(b.document.filename))
-  ), [documentViews, rightPaneIds]);
+  ), [documentViews, knowledgeBaseIds]);
+
+  const visibleRightViews = useMemo(() => (
+    rightViews.filter(({ document }) => (
+      !debouncedRightSearch || document.filename.toLowerCase().includes(debouncedRightSearch)
+    ))
+  ), [debouncedRightSearch, rightViews]);
 
   const eligibleLeftIds = useMemo(() => (
-    leftViews.filter(isEmbeddable).map((view) => view.document.id)
+    leftViews.map((view) => view.document.id)
   ), [leftViews]);
 
   const visibleEligibleLeftIds = useMemo(() => (
-    visibleLeftViews.filter(isEmbeddable).map((view) => view.document.id)
+    visibleLeftViews.map((view) => view.document.id)
   ), [visibleLeftViews]);
 
   const selectedEligibleLeftIds = useMemo(() => (
     eligibleLeftIds.filter((id) => leftSelection.has(id))
   ), [eligibleLeftIds, leftSelection]);
 
-  const rightIds = useMemo(() => (
-    rightViews.map((view) => view.document.id)
+  const visibleReturnableRightIds = useMemo(() => (
+    visibleRightViews.filter(canReturnToAvailable).map((view) => view.document.id)
+  ), [visibleRightViews]);
+
+  const returnableRightIds = useMemo(() => (
+    rightViews.filter(canReturnToAvailable).map((view) => view.document.id)
   ), [rightViews]);
+
+  const selectedReturnableRightIds = useMemo(() => (
+    returnableRightIds.filter((id) => rightSelection.has(id))
+  ), [returnableRightIds, rightSelection]);
 
   const allVisibleLeftSelected = visibleEligibleLeftIds.length > 0
     && visibleEligibleLeftIds.every((id) => leftSelection.has(id));
-  const allRightSelected = rightIds.length > 0
-    && rightIds.every((id) => rightSelection.has(id));
+  const allVisibleRightSelected = visibleReturnableRightIds.length > 0
+    && visibleReturnableRightIds.every((id) => rightSelection.has(id));
 
-  const selectedRightIds = rightIds.filter((id) => rightSelection.has(id));
-  const queuedDocuments = rightViews.map((view) => view.document);
   const isEmbeddingAny = embeddingDocumentIds.size > 0;
+  const embeddableKnowledgeViews = rightViews.filter((view) => (
+    view.statusGroup === 'pending' || view.statusGroup === 'failed'
+  ));
 
   const handleFiles = useCallback(async (incoming) => {
     const accepted = [];
@@ -364,15 +427,27 @@ export default function UploadBox() {
   }, [visibleEligibleLeftIds]);
 
   const toggleRightSelection = useCallback((isSelected) => {
-    setRightSelection(isSelected ? new Set(rightIds) : new Set());
-  }, [rightIds]);
+    setRightSelection((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      visibleReturnableRightIds.forEach((id) => {
+        if (isSelected) {
+          nextIds.add(id);
+        } else {
+          nextIds.delete(id);
+        }
+      });
+
+      return nextIds;
+    });
+  }, [visibleReturnableRightIds]);
 
   const moveSelectedRight = useCallback(() => {
     if (selectedEligibleLeftIds.length === 0) {
       return;
     }
 
-    setRightPaneIds((currentIds) => new Set([...currentIds, ...selectedEligibleLeftIds]));
+    setKnowledgeBaseIds((currentIds) => new Set([...currentIds, ...selectedEligibleLeftIds]));
     setLeftSelection((currentIds) => {
       const nextIds = new Set(currentIds);
       selectedEligibleLeftIds.forEach((id) => nextIds.delete(id));
@@ -385,7 +460,7 @@ export default function UploadBox() {
       return;
     }
 
-    setRightPaneIds((currentIds) => new Set([...currentIds, ...eligibleLeftIds]));
+    setKnowledgeBaseIds((currentIds) => new Set([...currentIds, ...eligibleLeftIds]));
     setLeftSelection((currentIds) => {
       const nextIds = new Set(currentIds);
       eligibleLeftIds.forEach((id) => nextIds.delete(id));
@@ -394,22 +469,26 @@ export default function UploadBox() {
   }, [eligibleLeftIds]);
 
   const moveSelectedLeft = useCallback(() => {
-    if (selectedRightIds.length === 0) {
+    if (selectedReturnableRightIds.length === 0) {
       return;
     }
 
-    setRightPaneIds((currentIds) => {
+    setKnowledgeBaseIds((currentIds) => {
       const nextIds = new Set(currentIds);
-      selectedRightIds.forEach((id) => nextIds.delete(id));
+      selectedReturnableRightIds.forEach((id) => nextIds.delete(id));
       return nextIds;
     });
     setRightSelection(new Set());
-  }, [selectedRightIds]);
+  }, [selectedReturnableRightIds]);
 
   const moveAllLeft = useCallback(() => {
-    setRightPaneIds(new Set());
+    setKnowledgeBaseIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      returnableRightIds.forEach((id) => nextIds.delete(id));
+      return nextIds;
+    });
     setRightSelection(new Set());
-  }, []);
+  }, [returnableRightIds]);
 
   const removeDocument = useCallback(async (document) => {
     const confirmed = window.confirm(`Remove ${document.filename}?`);
@@ -429,7 +508,7 @@ export default function UploadBox() {
         nextIds.delete(document.id);
         return nextIds;
       });
-      setRightPaneIds((currentIds) => {
+      setKnowledgeBaseIds((currentIds) => {
         const nextIds = new Set(currentIds);
         nextIds.delete(document.id);
         return nextIds;
@@ -444,8 +523,8 @@ export default function UploadBox() {
     }
   }, []);
 
-  const embedQueuedDocuments = useCallback(async () => {
-    const documentIds = queuedDocuments.map((document) => document.id);
+  const embedDocuments = useCallback(async (documentsToEmbed) => {
+    const documentIds = documentsToEmbed.map((document) => document.id);
 
     if (documentIds.length === 0) {
       return;
@@ -453,11 +532,6 @@ export default function UploadBox() {
 
     setErrorMessage('');
     setEmbeddingDocumentIds((currentIds) => new Set([...currentIds, ...documentIds]));
-    setRightPaneIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-      documentIds.forEach((id) => nextIds.delete(id));
-      return nextIds;
-    });
     setRightSelection(new Set());
 
     try {
@@ -473,12 +547,36 @@ export default function UploadBox() {
         return nextIds;
       });
     }
-  }, [queuedDocuments, refreshDocuments]);
+  }, [refreshDocuments]);
 
-  const clearQueue = useCallback(() => {
-    setRightPaneIds(new Set());
-    setRightSelection(new Set());
-  }, []);
+  const embedPendingAndFailed = useCallback(() => {
+    embedDocuments(embeddableKnowledgeViews.map((view) => view.document));
+  }, [embedDocuments, embeddableKnowledgeViews]);
+
+  const embedSingleDocument = useCallback((document) => {
+    embedDocuments([document]);
+  }, [embedDocuments]);
+
+  const clearFailedDocuments = useCallback(() => {
+    const failedIds = rightViews
+      .filter((view) => view.statusGroup === 'failed')
+      .map((view) => view.document.id);
+
+    if (failedIds.length === 0) {
+      return;
+    }
+
+    setKnowledgeBaseIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      failedIds.forEach((id) => nextIds.delete(id));
+      return nextIds;
+    });
+    setRightSelection((currentIds) => {
+      const nextIds = new Set(currentIds);
+      failedIds.forEach((id) => nextIds.delete(id));
+      return nextIds;
+    });
+  }, [rightViews]);
 
   return (
     <div className="upload-stage">
@@ -512,6 +610,7 @@ export default function UploadBox() {
             isLoading={isLoadingDocuments}
             searchValue={leftSearch}
             onSearchChange={setLeftSearch}
+            searchPlaceholder="Search available files..."
             selectedIds={leftSelection}
             allSelectableSelected={allVisibleLeftSelected}
             selectableCount={visibleEligibleLeftIds.length}
@@ -520,15 +619,15 @@ export default function UploadBox() {
             onRemoveFile={removeDocument}
             emptyTitle={documents.length === 0 ? 'Upload files to build your pool' : 'No files match this search'}
             emptyBody={documents.length === 0
-              ? 'Files stay here until you move them into the embedding queue.'
+              ? 'Files stay here until you move them into the knowledge base.'
               : 'Clear or change the search filter to see more files.'}
           />
 
           <TransferControls
             canMoveSelectedRight={selectedEligibleLeftIds.length > 0}
             canMoveAllRight={eligibleLeftIds.length > 0}
-            canMoveSelectedLeft={selectedRightIds.length > 0}
-            canMoveAllLeft={rightViews.length > 0}
+            canMoveSelectedLeft={selectedReturnableRightIds.length > 0}
+            canMoveAllLeft={returnableRightIds.length > 0}
             onMoveSelectedRight={moveSelectedRight}
             onMoveAllRight={moveAllRight}
             onMoveSelectedLeft={moveSelectedLeft}
@@ -536,27 +635,33 @@ export default function UploadBox() {
           />
 
           <TransferPane
-            title="Files to Embed"
+            title="Knowledge Base"
             count={rightViews.length}
-            variant="queue"
-            views={rightViews}
+            variant="knowledge"
+            views={visibleRightViews}
+            searchValue={rightSearch}
+            onSearchChange={setRightSearch}
+            searchPlaceholder="Search knowledge base..."
             selectedIds={rightSelection}
-            allSelectableSelected={allRightSelected}
-            selectableCount={rightViews.length}
+            allSelectableSelected={allVisibleRightSelected}
+            selectableCount={visibleReturnableRightIds.length}
             onSelectAll={toggleRightSelection}
             onSelectFile={selectRightFile}
             onRemoveFile={removeDocument}
-            onClearAll={clearQueue}
-            emptyTitle="No files selected for embedding"
-            emptyBody="Move pending or failed files here before starting an embedding job."
+            onEmbedFile={embedSingleDocument}
+            isActionDisabled={isEmbeddingAny}
+            emptyTitle={rightViews.length === 0 ? 'Knowledge base is empty' : 'No knowledge base files match this search'}
+            emptyBody={rightViews.length === 0
+              ? 'Move available files here to queue them for embedding.'
+              : 'Clear or change the search filter to see more files.'}
           />
         </section>
 
         <EmbedActionBar
-          documents={queuedDocuments}
+          views={rightViews}
           isEmbedding={isEmbeddingAny}
-          onEmbed={embedQueuedDocuments}
-          onCancel={clearQueue}
+          onEmbed={embedPendingAndFailed}
+          onClearFailed={clearFailedDocuments}
         />
       </div>
     </div>

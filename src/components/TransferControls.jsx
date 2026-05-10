@@ -28,7 +28,7 @@ export default function TransferControls({
   return (
     <div className="transfer-controls" aria-label="Move files between panes">
       <TransferButton
-        label="Move selected files to embed queue"
+        label="Move selected files to Knowledge Base"
         disabled={!canMoveSelectedRight}
         onClick={onMoveSelectedRight}
       >
@@ -36,7 +36,7 @@ export default function TransferControls({
       </TransferButton>
 
       <TransferButton
-        label="Move all eligible files to embed queue"
+        label="Move all available files to Knowledge Base"
         disabled={!canMoveAllRight}
         onClick={onMoveAllRight}
       >
@@ -52,7 +52,7 @@ export default function TransferControls({
       </TransferButton>
 
       <TransferButton
-        label="Move all files back to available files"
+        label="Return all queued or failed files to available files"
         disabled={!canMoveAllLeft}
         onClick={onMoveAllLeft}
       >

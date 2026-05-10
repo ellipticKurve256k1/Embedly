@@ -16,13 +16,16 @@ export default function TransferPane({
   onSelectAll,
   onSelectFile,
   onRemoveFile,
+  onEmbedFile,
+  isActionDisabled = false,
   onClearAll,
+  searchPlaceholder = 'Search files...',
   emptyTitle,
   emptyBody,
 }) {
   const showSearch = typeof searchValue === 'string' && onSearchChange;
   const hasRows = views.length > 0 || uploadingFiles.length > 0;
-  const isQueue = variant === 'queue';
+  const showClear = Boolean(onClearAll) && count > 0;
 
   return (
     <section className={`transfer-pane is-${variant}`} aria-label={title}>
@@ -32,7 +35,7 @@ export default function TransferPane({
           <span>{count}</span>
         </div>
 
-        {isQueue && count > 0 && (
+        {showClear && (
           <button className="transfer-clear-button" type="button" onClick={onClearAll}>
             Clear all
           </button>
@@ -56,7 +59,7 @@ export default function TransferPane({
             <input
               type="search"
               value={searchValue}
-              placeholder="Search available files..."
+              placeholder={searchPlaceholder}
               onChange={(event) => onSearchChange(event.target.value)}
             />
           </label>
@@ -82,6 +85,8 @@ export default function TransferPane({
               isSelected={selectedIds.has(view.document.id)}
               onSelect={onSelectFile}
               onRemove={onRemoveFile}
+              onEmbed={onEmbedFile}
+              isActionDisabled={isActionDisabled}
             />
           ))
         )}

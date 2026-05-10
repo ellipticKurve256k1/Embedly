@@ -1,4 +1,4 @@
-import { LoaderCircle, Lock, Trash2 } from 'lucide-react';
+import { LoaderCircle, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import FileIcon from './FileIcon.jsx';
 
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
@@ -17,19 +17,13 @@ function getProgressPercent(progress) {
   return Math.min(100, Math.round((processed / total) * 100));
 }
 
-function getImpactLabel(document) {
-  const chunkCount = document.chunkCount ?? 0;
-  const sizeBytes = document.sizeBytes ?? 0;
-
-  if (chunkCount > 0) return `${chunkCount} chunks`;
-  if (sizeBytes < 50 * 1024) return 'Small';
-  if (sizeBytes > 1024 * 1024) return 'Large';
-  return 'Medium';
+function getKnowledgeStatus(displayStatus) {
+  return displayStatus === 'pending' ? 'queued' : displayStatus;
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, error }) {
   return (
-    <span className={`transfer-status-badge is-${status}`}>
+    <span className={`transfer-status-badge is-${status}`} title={error || status}>
       {status}
     </span>
   );
@@ -60,28 +54,6 @@ function ProgressStatus({ status, progress, chunkCount }) {
   );
 }
 
-function DisabledReason({ status }) {
-  if (status === 'completed') {
-    return (
-      <span className="transfer-disabled-reason" title="Already embedded">
-        <Lock size={12} />
-        <span>Embedded</span>
-      </span>
-    );
-  }
-
-  if (ACTIVE_STATUSES.has(status)) {
-    return (
-      <span className="transfer-disabled-reason is-active">
-        <LoaderCircle size={12} />
-        <span>Busy</span>
-      </span>
-    );
-  }
-
-  return null;
-}
-
 export function UploadingTransferRow({ file }) {
   return (
     <div className="transfer-row is-uploading">
@@ -109,12 +81,18 @@ export default function FileTransferRow({
   isSelected,
   onSelect,
   onRemove,
+  onEmbed,
+  isActionDisabled,
 }) {
   const { document, displayStatus, progress, statusGroup } = view;
   const isActive = ACTIVE_STATUSES.has(displayStatus);
-  const isSelectable = variant === 'queue' || statusGroup === 'pending' || statusGroup === 'failed';
-  const isQueue = variant === 'queue';
+  const isKnowledge = variant === 'knowledge';
+  const isSelectable = !isKnowledge || statusGroup === 'pending' || statusGroup === 'failed';
+  const knowledgeStatus = getKnowledgeStatus(displayStatus);
+  const showReembed = isKnowledge && statusGroup === 'completed';
+  const showRetry = isKnowledge && statusGroup === 'failed';
   const checkboxLabel = `${isSelected ? 'Deselect' : 'Select'} ${document.filename}`;
+  const errorMessage = document.error || progress?.error || '';
 
   return (
     <div className={`transfer-row is-${displayStatus}${isSelected ? ' is-selected' : ''}${!isSelectable ? ' is-disabled' : ''}`}>
@@ -137,29 +115,41 @@ export default function FileTransferRow({
       </div>
 
       <div className="transfer-row-meta">
-        {isQueue ? (
-          <span className="transfer-impact-badge">{getImpactLabel(document)}</span>
-        ) : isActive ? (
+        {!isKnowledge ? null : isActive ? (
           <ProgressStatus status={displayStatus} progress={progress} chunkCount={document.chunkCount} />
         ) : (
           <>
-            <StatusBadge status={displayStatus} />
+            <StatusBadge status={knowledgeStatus} error={errorMessage} />
             {document.chunkCount > 0 && (
               <span className="transfer-chunk-count">{document.chunkCount} chunks</span>
             )}
-            <DisabledReason status={displayStatus} />
           </>
         )}
       </div>
 
-      <button
-        className="transfer-row-remove"
-        type="button"
-        aria-label={`Remove ${document.filename}`}
-        onClick={() => onRemove(document)}
-      >
-        <Trash2 size={14} />
-      </button>
+      <div className="transfer-row-actions">
+        {(showRetry || showReembed) && (
+          <button
+            className="transfer-row-action"
+            type="button"
+            disabled={isActionDisabled}
+            aria-label={`${showRetry ? 'Retry' : 'Re-embed'} ${document.filename}`}
+            onClick={() => onEmbed(document)}
+          >
+            {showRetry ? <RotateCcw size={14} /> : <Sparkles size={14} />}
+            <span>{showRetry ? 'Retry' : 'Re-embed'}</span>
+          </button>
+        )}
+
+        <button
+          className="transfer-row-remove"
+          type="button"
+          aria-label={`Remove ${document.filename}`}
+          onClick={() => onRemove(document)}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 }
