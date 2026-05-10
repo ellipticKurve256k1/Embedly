@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Award, CircleDot, Hash } from 'lucide-react';
 import './SearchResults.css';
 
 function formatScore(score) {
@@ -14,12 +14,12 @@ export default function SearchResults({
   onSelectResult,
   onClosePreview,
 }) {
-  // Auto-select first result when results arrive
+  // Auto-select first result when a new search returns
   useEffect(() => {
-    if (results && results.length > 0 && !selectedResult) {
+    if (results && results.length > 0) {
       onSelectResult(results[0]);
     }
-  }, [results, selectedResult, onSelectResult]);
+  }, [results]); // only when results reference changes (new search)
 
   if (!results || results.length === 0) {
     return (
@@ -48,15 +48,27 @@ export default function SearchResults({
           {results.map((result, index) => {
             const isSelected = selectedResult?.chunkId === result.chunkId;
             const score = result.score ?? 0;
+            const rank = index + 1;
+            const rankClass = rank <= 3 ? ` rank-${rank}` : '';
 
             return (
               <button
                 key={result.chunkId ?? index}
-                className={`result-list-item${isSelected ? ' is-selected' : ''}`}
+                className={`result-list-item${isSelected ? ' is-selected' : ''}${rankClass}`}
                 onClick={() => onSelectResult(result)}
                 type="button"
               >
-                <div className="result-item-rank">{index + 1}</div>
+                <div className="result-item-rank">
+                    {rank === 1 ? (
+                      <Award size={16} />
+                    ) : rank === 2 ? (
+                      <CircleDot size={16} />
+                    ) : rank === 3 ? (
+                      <Hash size={16} />
+                    ) : (
+                      rank
+                    )}
+                  </div>
 
                 <div className="result-item-body">
                   <div className="result-item-top">
