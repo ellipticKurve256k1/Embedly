@@ -1,6 +1,7 @@
 import {
   readSavedChunkingConfig,
   readSavedEmbeddingSetup,
+  readSavedLlmSetup,
 } from './storage.js';
 
 const API_BASE = 'http://localhost:3001/api';
@@ -70,4 +71,92 @@ export async function searchQuery(query) {
 
   const response = await fetch(`${API_BASE}/search?${searchParams.toString()}`);
   return parseResponse(response);
+}
+
+function parseSseMessage(rawMessage) {
+  const lines = rawMessage.split('\n');
+  let event = 'message';
+  const dataLines = [];
+
+  for (const line of lines) {
+    if (line.startsWith('event:')) {
+      event = line.slice('event:'.length).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).trim());
+    }
+  }
+
+  const dataText = dataLines.join('\n');
+  const data = dataText ? JSON.parse(dataText) : {};
+
+  return { event, data };
+}
+
+export async function streamChatResponse({
+  message,
+  conversationId,
+  context,
+  onToken,
+  onDone,
+  onError,
+  signal,
+}) {
+  const llmSetup = readSavedLlmSetup();
+  const response = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      message,
+      conversationId,
+      model: llmSetup?.model,
+      context,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || `Chat failed with ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error('Chat response stream is unavailable.');
+  }
+
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  let buffer = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const messages = buffer.split('\n\n');
+    buffer = messages.pop() ?? '';
+
+    for (const rawMessage of messages) {
+      if (!rawMessage.trim()) continue;
+
+      const { event, data } = parseSseMessage(rawMessage);
+
+      if (event === 'token') {
+        onToken?.(data.content ?? '');
+      } else if (event === 'done') {
+        onDone?.(data);
+      } else if (event === 'error') {
+        const error = new Error(data.error || 'Chat generation failed.');
+        onError?.(error);
+        throw error;
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    const { event, data } = parseSseMessage(buffer);
+    if (event === 'done') {
+      onDone?.(data);
+    }
+  }
 }

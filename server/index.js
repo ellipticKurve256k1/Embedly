@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import './db.js';
+import chatRouter from './routes/chat.js';
 import documentsRouter from './routes/documents.js';
 import embedRouter from './routes/embed.js';
 import jobsRouter from './routes/jobs.js';
@@ -18,6 +19,7 @@ app.get('/api/health', (_request, response) => {
 });
 
 app.use('/api/upload', uploadRouter);
+app.use('/api/chat', chatRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/embed', embedRouter);
 app.use('/api/jobs', jobsRouter);

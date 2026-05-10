@@ -23,6 +23,7 @@ router.get('/', async (request, response) => {
     SELECT
       embeddings.vector,
       chunks.id AS chunk_id,
+      chunks.idx AS chunk_index,
       chunks.content,
       documents.id AS document_id,
       documents.filename AS document_name
@@ -34,6 +35,7 @@ router.get('/', async (request, response) => {
   const results = rows
     .map((row) => ({
       chunkId: row.chunk_id,
+      chunkIndex: row.chunk_index,
       content: row.content,
       documentId: row.document_id,
       documentName: row.document_name,

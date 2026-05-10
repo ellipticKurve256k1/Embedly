@@ -14,13 +14,14 @@ import ModeTabs from './components/ModeTabs';
 import UploadBox from './components/UploadBox';
 import ModelStatusBar from './components/ModelStatusBar';
 import SearchResults from './components/SearchResults';
+import ChatPanel from './components/ChatPanel';
 
 export default function App() {
   const [page, setPage] = useState(() => (
     window.location.hash === '#settings' ? 'settings' : 'search'
   ));
 
-  const [mode, setMode] = useState('search');
+  const [mode, setMode] = useState('chat');
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
   const [llmSetup, setLlmSetup] = useState(() => readSavedLlmSetup());
   const [vectorDbSetup, setVectorDbSetup] = useState(() => readSavedVectorDbSetup());
@@ -34,7 +35,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       setPage(window.location.hash === '#settings' ? 'settings' : 'search');
-      setMode('search');
+      setMode('chat');
       setEmbeddingSetup(readSavedEmbeddingSetup());
       setLlmSetup(readSavedLlmSetup());
       setVectorDbSetup(readSavedVectorDbSetup());
@@ -108,6 +109,8 @@ export default function App() {
         </header>
 
         <ModeTabs activeMode={mode} onModeChange={setMode} />
+
+        {mode === 'chat' && <ChatPanel />}
 
         {mode === 'search' && (
           <div className={`search-stage${hasResults ? ' has-results' : ''}`}>

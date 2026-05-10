@@ -1,7 +1,8 @@
-import { Search, Upload } from 'lucide-react';
+import { MessageCircle, Search, Upload } from 'lucide-react';
 import './ModeTabs.css';
 
 const tabs = [
+  { key: 'chat', label: 'Chat', icon: MessageCircle },
   { key: 'search', label: 'Search', icon: Search },
   { key: 'upload', label: 'Upload', icon: Upload },
 ];
