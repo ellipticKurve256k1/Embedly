@@ -4,27 +4,24 @@ import {
   AlertTriangle,
   CircleHelp,
   Database,
-  LockKeyhole,
   RefreshCw,
   Save,
   Search,
   Server,
-  SlidersHorizontal,
   WandSparkles,
   X,
   Zap,
 } from 'lucide-react';
 import logoSrc from '../../ref/embedly.png';
 import {
-  CHUNKING_CONFIG_STORAGE_KEY,
-  EMBEDDING_SETUP_STORAGE_KEY,
-  LLM_SETUP_STORAGE_KEY,
-  VECTOR_DB_SETUP_STORAGE_KEY,
   readSavedEmbeddingSetup,
   readSavedChunkingConfig,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
-  normalizeChunkingConfig,
+  saveChunkingConfig,
+  saveEmbeddingSetup,
+  saveLlmSetup,
+  saveVectorDbSetup,
 } from '../lib/storage.js';
 import './SettingsPage.css';
 
@@ -106,6 +103,14 @@ function hasModelName(model) {
   return Boolean(String(model ?? '').trim());
 }
 
+function getSaveStatus(section, saveStatus) {
+  if (saveStatus.section !== section) {
+    return null;
+  }
+
+  return saveStatus;
+}
+
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('embedding');
   const [embeddingSetup, setEmbeddingSetup] = useState(readSavedEmbeddingSetup);
@@ -132,6 +137,8 @@ export default function SettingsPage() {
   );
   const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
+  const [savingSection, setSavingSection] = useState(null);
+  const [saveStatus, setSaveStatus] = useState({ section: null, type: null, message: '' });
   const activeProvider = embeddingProviders.find((provider) => provider.id === selectedProvider);
   const ActiveProviderSetup = activeProvider?.component;
   const activeLlmProvider = llmProviders.find((provider) => provider.id === selectedLlmProvider);
@@ -141,7 +148,27 @@ export default function SettingsPage() {
   );
   const ActiveVectorDbSetup = activeVectorDbProvider?.component;
 
-  const handleSaveEmbeddingChanges = () => {
+  const saveWithStatus = useCallback(async (section, action, successMessage) => {
+    setSavingSection(section);
+    setSaveStatus({ section: null, type: null, message: '' });
+
+    try {
+      const result = await action();
+      setSaveStatus({ section, type: 'success', message: successMessage });
+      return result;
+    } catch (error) {
+      setSaveStatus({
+        section,
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to save settings.',
+      });
+      return null;
+    } finally {
+      setSavingSection(null);
+    }
+  }, []);
+
+  const handleSaveEmbeddingChanges = async () => {
     if (!selectedProvider || !selectedModel) {
       return;
     }
@@ -152,12 +179,19 @@ export default function SettingsPage() {
       endpoint: OLLAMA_BASE_URL,
     };
 
-    window.localStorage.setItem(EMBEDDING_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
-    setEmbeddingSetup(nextSetup);
-    setIsEditingSetup(false);
+    const savedSetup = await saveWithStatus(
+      'embedding',
+      () => saveEmbeddingSetup(nextSetup),
+      'Embedding settings saved.',
+    );
+
+    if (savedSetup) {
+      setEmbeddingSetup(savedSetup);
+      setIsEditingSetup(false);
+    }
   };
 
-  const handleSaveLlmChanges = () => {
+  const handleSaveLlmChanges = async () => {
     if (!selectedLlmProvider || !hasModelName(selectedLlmModel) || !isValidLlmSetup({
       provider: selectedLlmProvider,
       endpoint: selectedLlmEndpoint,
@@ -179,12 +213,20 @@ export default function SettingsPage() {
         endpoint: OLLAMA_BASE_URL,
       };
 
-    window.localStorage.setItem(LLM_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
-    setLlmSetup(nextSetup);
-    setIsEditingLlmSetup(false);
+    const savedSetup = await saveWithStatus(
+      'generation',
+      () => saveLlmSetup(nextSetup),
+      'Generation settings saved.',
+    );
+
+    if (savedSetup) {
+      setLlmSetup(savedSetup);
+      setSelectedLlmApiKey(savedSetup.apiKey ?? '');
+      setIsEditingLlmSetup(false);
+    }
   };
 
-  const handleSelectVectorDbProvider = (providerId) => {
+  const handleSelectVectorDbProvider = async (providerId) => {
     const selectedProviderConfig = vectorDbProviders.find((provider) => provider.id === providerId);
 
     if (!selectedProviderConfig) {
@@ -196,15 +238,29 @@ export default function SettingsPage() {
       name: selectedProviderConfig.name,
     };
 
-    window.localStorage.setItem(VECTOR_DB_SETUP_STORAGE_KEY, JSON.stringify(nextSetup));
-    setVectorDbSetup(nextSetup);
     setSelectedVectorDbProvider(providerId);
+
+    const savedSetup = await saveWithStatus(
+      'vector-db',
+      () => saveVectorDbSetup(nextSetup),
+      'Vector database settings saved.',
+    );
+
+    if (savedSetup) {
+      setVectorDbSetup(savedSetup);
+    }
   };
 
-  const handleSaveChunkingConfig = () => {
-    const nextConfig = normalizeChunkingConfig(chunkingConfig);
-    window.localStorage.setItem(CHUNKING_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig));
-    setChunkingConfig(nextConfig);
+  const handleSaveChunkingConfig = async () => {
+    const savedConfig = await saveWithStatus(
+      'retrieval',
+      () => saveChunkingConfig(chunkingConfig),
+      'Retrieval settings saved.',
+    );
+
+    if (savedConfig) {
+      setChunkingConfig(savedConfig);
+    }
   };
 
   return (
@@ -248,6 +304,8 @@ export default function SettingsPage() {
                 isEditingSetup={isEditingSetup}
                 advancedOptionsEnabled={advancedOptionsEnabled}
                 ActiveProviderSetup={ActiveProviderSetup}
+                isSaving={savingSection === 'embedding'}
+                saveStatus={getSaveStatus('embedding', saveStatus)}
                 onAdvancedOptionsChange={setAdvancedOptionsEnabled}
                 onEditSetup={() => setIsEditingSetup(true)}
                 onSave={handleSaveEmbeddingChanges}
@@ -267,6 +325,8 @@ export default function SettingsPage() {
                 isEditingSetup={isEditingLlmSetup}
                 advancedOptionsEnabled={advancedOptionsEnabled}
                 ActiveProviderSetup={ActiveLlmProviderSetup}
+                isSaving={savingSection === 'generation'}
+                saveStatus={getSaveStatus('generation', saveStatus)}
                 onAdvancedOptionsChange={setAdvancedOptionsEnabled}
                 onEditSetup={() => setIsEditingLlmSetup(true)}
                 onSave={handleSaveLlmChanges}
@@ -288,6 +348,8 @@ export default function SettingsPage() {
             {activeSection === 'retrieval' && (
               <RetrievalSettingsPanel
                 chunkingConfig={chunkingConfig}
+                isSaving={savingSection === 'retrieval'}
+                saveStatus={getSaveStatus('retrieval', saveStatus)}
                 onChange={setChunkingConfig}
                 onSave={handleSaveChunkingConfig}
               />
@@ -297,6 +359,7 @@ export default function SettingsPage() {
               <VectorDbSettingsPanel
                 selectedProvider={selectedVectorDbProvider}
                 ActiveProviderSetup={ActiveVectorDbSetup}
+                saveStatus={getSaveStatus('vector-db', saveStatus)}
                 onSelectProvider={handleSelectVectorDbProvider}
               />
             )}
@@ -314,7 +377,7 @@ export default function SettingsPage() {
   );
 }
 
-function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
+function RetrievalSettingsPanel({ chunkingConfig, isSaving, saveStatus, onChange, onSave }) {
   const updateConfig = (field, value) => {
     onChange((currentConfig) => ({
       ...currentConfig,
@@ -445,10 +508,12 @@ function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
       </div>
 
       <SaveSettingsButton
-        disabled={false}
-        label="Save retrieval settings"
+        disabled={isSaving}
+        isSaving={isSaving}
+        label={isSaving ? 'Saving...' : 'Save retrieval settings'}
         onClick={onSave}
       />
+      <SaveStatusMessage status={saveStatus} />
     </section>
   );
 }
@@ -456,6 +521,7 @@ function RetrievalSettingsPanel({ chunkingConfig, onChange, onSave }) {
 function VectorDbSettingsPanel({
   selectedProvider,
   ActiveProviderSetup,
+  saveStatus,
   onSelectProvider,
 }) {
   return (
@@ -477,6 +543,7 @@ function VectorDbSettingsPanel({
       />
 
       {ActiveProviderSetup && <ActiveProviderSetup />}
+      <SaveStatusMessage status={saveStatus} />
     </section>
   );
 }
@@ -513,6 +580,8 @@ function EmbeddingSettingsPanel({
   isEditingSetup,
   advancedOptionsEnabled,
   ActiveProviderSetup,
+  isSaving,
+  saveStatus,
   onAdvancedOptionsChange,
   onEditSetup,
   onSave,
@@ -560,10 +629,12 @@ function EmbeddingSettingsPanel({
       />
 
       <SaveSettingsButton
-        disabled={!selectedModel}
-        label={embeddingSetup ? 'Save changes' : 'Save setup'}
+        disabled={!selectedModel || isSaving}
+        isSaving={isSaving}
+        label={isSaving ? 'Saving...' : embeddingSetup ? 'Save changes' : 'Save setup'}
         onClick={onSave}
       />
+      <SaveStatusMessage status={saveStatus} />
     </section>
   );
 }
@@ -577,6 +648,8 @@ function GenerationSettingsPanel({
   isEditingSetup,
   advancedOptionsEnabled,
   ActiveProviderSetup,
+  isSaving,
+  saveStatus,
   onAdvancedOptionsChange,
   onEditSetup,
   onSave,
@@ -636,10 +709,12 @@ function GenerationSettingsPanel({
       />
 
       <SaveSettingsButton
-        disabled={!canSave}
-        label={llmSetup ? 'Save changes' : 'Save setup'}
+        disabled={!canSave || isSaving}
+        isSaving={isSaving}
+        label={isSaving ? 'Saving...' : llmSetup ? 'Save changes' : 'Save setup'}
         onClick={onSave}
       />
+      <SaveStatusMessage status={saveStatus} />
     </section>
   );
 }
@@ -699,7 +774,7 @@ function AdvancedOption({ enabled, label, summary, onChange }) {
   );
 }
 
-function SaveSettingsButton({ disabled, label, onClick }) {
+function SaveSettingsButton({ disabled, isSaving = false, label, onClick }) {
   return (
     <button
       className="save-button"
@@ -707,9 +782,22 @@ function SaveSettingsButton({ disabled, label, onClick }) {
       disabled={disabled}
       onClick={onClick}
     >
-      <Save size={18} />
+      {isSaving ? <RefreshCw size={18} /> : <Save size={18} />}
       <span>{label}</span>
     </button>
+  );
+}
+
+function SaveStatusMessage({ status }) {
+  if (!status?.message) {
+    return null;
+  }
+
+  return (
+    <div className={`setup-message is-${status.type}`} role={status.type === 'error' ? 'alert' : 'status'}>
+      {status.type === 'error' ? <AlertCircle size={18} /> : <Save size={18} />}
+      <span>{status.message}</span>
+    </div>
   );
 }
 
@@ -836,7 +924,7 @@ function ApiLlmSetup({
         <label className="settings-field">
           <span>
             <strong>API key</strong>
-            <small>Stored in this browser only and sent to the backend per request.</small>
+            <small>Stored encrypted on the local server and masked after saving.</small>
           </span>
           <input
             type="password"

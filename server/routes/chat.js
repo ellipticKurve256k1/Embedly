@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_EMBEDDING_MODEL } from '../services/embedder.js';
 import { buildChatMessages, rewriteRetrievalQuery, streamChat } from '../services/llm.js';
 import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
+import { getEmbeddingSetup, getLlmSetup, isMaskedApiKey } from '../services/settings.js';
 
 const router = express.Router();
 const conversations = new Map();
@@ -46,15 +47,25 @@ function selectBetterChunks(originalChunks, rewrittenChunks) {
 
 router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
+  const savedLlmSetup = getLlmSetup() ?? {};
   const rawLlmSetup = request.body?.llmSetup && typeof request.body.llmSetup === 'object'
     ? request.body.llmSetup
     : {};
-  const provider = rawLlmSetup.provider === 'api' ? 'api' : 'ollama';
-  const model = String(rawLlmSetup.model ?? request.body?.model ?? '').trim();
-  const endpoint = String(rawLlmSetup.endpoint ?? '').trim();
-  const apiKey = String(rawLlmSetup.apiKey ?? '').trim();
+  const provider = (rawLlmSetup.provider ?? savedLlmSetup.provider) === 'api' ? 'api' : 'ollama';
+  const model = String(rawLlmSetup.model ?? request.body?.model ?? savedLlmSetup.model ?? '').trim();
+  const endpoint = String(rawLlmSetup.endpoint ?? savedLlmSetup.endpoint ?? '').trim();
+  const requestedApiKey = String(rawLlmSetup.apiKey ?? '').trim();
+  const savedApiKey = String(savedLlmSetup.apiKey ?? '').trim();
+  const apiKey = requestedApiKey && !isMaskedApiKey(requestedApiKey)
+    ? requestedApiKey
+    : savedApiKey;
   const llmConfig = { provider, model, endpoint, apiKey };
-  const embeddingModel = String(request.body?.embeddingModel || DEFAULT_EMBEDDING_MODEL).trim();
+  const savedEmbeddingSetup = getEmbeddingSetup() ?? {};
+  const embeddingModel = String(
+    request.body?.embeddingModel
+      || savedEmbeddingSetup.model
+      || DEFAULT_EMBEDDING_MODEL,
+  ).trim();
   const rawConversationId = request.body?.conversationId;
   const conversationId = (typeof rawConversationId === 'string' && rawConversationId.trim())
     ? rawConversationId.trim()

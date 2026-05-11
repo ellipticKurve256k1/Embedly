@@ -62,6 +62,13 @@ db.exec(`
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    encrypted INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);
   CREATE INDEX IF NOT EXISTS idx_embeddings_chunk_id ON embeddings(chunk_id);
   CREATE INDEX IF NOT EXISTS idx_jobs_document_id ON embedding_jobs(document_id);

@@ -6,6 +6,7 @@ import documentsRouter from './routes/documents.js';
 import embedRouter from './routes/embed.js';
 import jobsRouter from './routes/jobs.js';
 import searchRouter from './routes/search.js';
+import settingsRouter from './routes/settings.js';
 import uploadRouter from './routes/upload.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -24,6 +25,7 @@ app.use('/api/documents', documentsRouter);
 app.use('/api/embed', embedRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/settings', settingsRouter);
 
 app.use((error, _request, response, _next) => {
   const status = error.statusCode || error.status || 500;

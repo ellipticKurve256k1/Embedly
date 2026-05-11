@@ -1,137 +1,250 @@
-# Embeddly — Design System
+# Embeddly Design System
+
+Last updated: 2026-05-11
 
 ## 1. Layout Architecture
 
-```
-┌─────────────────────────────────┐
-│  [Logo]              [Settings] │  ← Topbar (auto)
-│                                 │
-│         ┌───────────┐           │
-│         │ ○ ○ ○ ○ ○ │           │  ← Orbital field (absolute, decorative)
-│         │           │           │
-│         │  🔍 Search │           │  ← Search box (centered)
-│         └───────────┘           │
-│                                 │
-│  [Feature] [Feature] [Feature]  │  ← Feature pills (auto, 3-col grid)
-└─────────────────────────────────┘
-  ↑ .landing-shell — full-viewport card with rounded corners
+Embeddly uses a search-first application shell built around `.landing-shell`, a full-viewport frosted panel inside the page background.
+
+```text
+main.app
+  section.landing-shell
+    header.topbar
+    main content area
 ```
 
-`.landing-shell` uses a **3-row CSS Grid** (`auto / 1fr / auto`):
+Main layouts:
 
-- **Topbar** (auto): logo + settings button
-- **Search stage** (`1fr`): orbital field (absolute) + search box (centered)
-- **Feature row** (auto): 3-column grid of feature pills
+| Surface | Primary Layout | Notes |
+|---------|----------------|-------|
+| Landing/search | Topbar, centered search stage, optional results | The search field is the hero control until results appear. |
+| Chat | Topbar, mode tabs, split chat body, fixed input footer | Sources sit beside messages on wide screens. |
+| Upload | Topbar, mode tabs, drop zone, dual transfer panes | Designed for repeated file triage. |
+| Settings | Topbar, vertical nav, detail panel | Nav collapses to horizontal scroll on mobile. |
+
+The topbar carries the logo, mode switching, configured model status, and settings button. Content surfaces keep a constrained inner rhythm while the outer shell supplies depth and separation.
 
 ## 2. Color Palette
 
 | Role | Value | Usage |
 |------|-------|-------|
 | Background | `#f4f7ff` | Page base |
-| Text primary | `#17213b` | Headings, input text |
-| Text secondary | `#8c96ad` | Placeholders, subtitle |
-| Accent primary | `#6258ff` / `#665cff` | Feature pill icon/text |
-| Accent hover | `#574cff` | Button hover state |
-| Borders | `rgba(132, 146, 184, 0.18–0.22)` | Subtle translucent borders |
+| Text primary | `#17213b` / `#24304b` | Headings, input text, strong labels |
+| Text secondary | `#6f7a94` / `#8c96ad` | Body copy, hints, metadata |
+| Accent primary | `#6258ff` / `#665cff` | Selected states, icons, primary actions |
+| Accent hover | `#574cff` | Button and link hover states |
+| Success | `#27745b` | Completed jobs, saved settings |
+| Warning | `#8a5c16` | External API privacy warning |
+| Error | `#9f4452` | Failed jobs, validation, request errors |
+| Borders | `rgba(132, 146, 184, 0.18-0.22)` | Subtle translucent dividers |
 
-Palette mood: cool blue-indigo, soft and professional. No hard blacks — everything uses muted slate tones.
+The palette is cool, soft, and professional. Hard black is avoided in favor of muted slate tones.
 
-## 3. Glassmorphism / Frosted Glass
+## 3. Glassmorphism
 
-Almost every surface uses **translucent white backgrounds** with layered box-shadows:
+Most surfaces use translucent white backgrounds with layered shadows:
 
 ```css
-background: rgba(255, 255, 255, 0.72);  /* 72% white */
-background: rgba(255, 255, 255, 0.9);   /* 90% white for search */
+background: rgba(255, 255, 255, 0.72);
+box-shadow:
+  0 14px 30px rgba(76, 88, 139, 0.09),
+  inset 0 1px 0 rgba(255, 255, 255, 0.86);
 ```
 
-Combined with:
+Use glass treatment for panels, cards, settings controls, transfer panes, model cards, and compact status elements. Reserve stronger shadows for primary controls such as the search box and save buttons.
 
-- **Multi-layer box-shadows**: outer shadow (depth) + `inset 0 1px 0` (top highlight)
-- **Pseudo-element overlays**: `.landing-shell::before` adds a subtle gradient sheen
+## 4. Orbital Field
 
-## 4. Orbital Field — Decorative Background
+`.orbital-field` is decorative only and must keep `aria-hidden="true"`.
 
-`.orbital-field` is a **purely decorative** (`aria-hidden`) element:
-
-- **Concentric dotted rings** via `repeating-radial-gradient`
-- **3 organic-shaped ellipses** using `::before`, `::after`, and `<span>` children with `border-radius: 42% 58% 47% 53%` (blobby shapes)
-- **Masked** with `mask-image` to fade in/out radially
-- **No animation** — static, but creates a "knowledge constellation" feel
+- Concentric dotted rings are rendered with `repeating-radial-gradient`.
+- Soft organic ellipses use pseudo-elements and child spans.
+- A radial mask fades the field outward.
+- It is static, not animated, so it adds a knowledge-constellation feel without distracting from input.
 
 ## 5. Typography
 
 ```css
-font-family: Inter, ui-sans-serif, system-ui, ...;
+font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 ```
 
-- **Font**: Inter (Google Fonts)
-- **Search input**: `clamp(17px, 2vw, 20px)` — fluid sizing
-- **Feature titles**: 13px bold
-- **Feature subtitles**: 10px semibold
+| Element | Style |
+|---------|-------|
+| Page headings | 20-28px, 800 weight |
+| Section headings | 20-24px, 800 weight |
+| Search input | 17-20px, 750 weight |
+| Card titles | 14-16px, 800 weight |
+| Metadata and hints | 12-13px, 600-700 weight |
 
-Uses `clamp()` extensively for **fluid responsive typography** without media queries.
+Use `clamp()` for large layout spacing and hero-scale text. Do not scale normal interface text with viewport width.
 
 ## 6. Spacing System
 
-Everything uses `clamp()` for fluid spacing:
+Fluid spacing is used at page and shell level:
 
 ```css
-padding: clamp(20px, 3vw, 38px);      /* landing-shell */
-gap: clamp(14px, 2vh, 24px);          /* grid gap */
-min-height: clamp(64px, 8vh, 78px);   /* search box */
+padding: clamp(20px, 3vw, 38px);
+gap: clamp(14px, 2vh, 24px);
 ```
 
-Pattern: `clamp(min, preferred, max)` — scales smoothly between viewport sizes.
+Component interiors generally use 10-18px gaps and padding. Dense operational views such as upload, settings, and chat favor organized compact spacing over marketing-style whitespace.
 
 ## 7. Component Design
 
 | Component | Shape | Radius | Style |
 |-----------|-------|--------|-------|
-| `.landing-shell` | Card | 24px | Glass, multi-shadow, gradient overlay |
-| `.icon-button` | Square | 14px | Glass, subtle hover lift (`translateY(-1px)`) |
-| `.search-box` | Pill | 999px | Glass, search icon left-aligned |
-| `.feature-pill` | Rounded rect | 16px | Glass, icon + text row |
+| `.landing-shell` | App shell | 20-24px | Frosted card with inset highlight |
+| `.icon-button` | Square control | 14px | Glass button with hover lift |
+| `.search-box` | Pill input | 999px | Large glass search control |
+| `.model-card` | Selectable card | 14px | Radio row, selected accent border |
+| `.configured-model-card` | Summary card | 14px | Provider icon, model text, change action |
+| `.setup-message` | Inline banner | 14px | Info, warning, error, or success state |
+| `.save-button` | Primary action | 10px | Accent gradient, icon plus label |
 
-Search box is the hero element — pill-shaped, large, with prominent shadow.
+Cards are used for individual repeated items and controls, not for nesting full sections inside other cards.
 
 ## 8. Interaction States
 
+Interactive states use short transitions, typically `160ms ease`.
+
 ```css
 .icon-button:hover {
-  color: #574cff;                /* accent purple */
-  transform: translateY(-1px);   /* subtle lift */
-  box-shadow: ...;               /* deeper shadow */
+  color: #574cff;
+  transform: translateY(-1px);
 }
 ```
 
-Transitions: `160ms ease` — snappy but not instant.
+Selected state conventions:
+
+- Selected provider/model cards use accent borders and subtle inset outlines.
+- Disabled buttons reduce opacity and remove hover lift.
+- Error states use red-tinted backgrounds and `role="alert"` where user action is needed.
+- Loading states use spinner icons or clear status text without resizing the surrounding layout.
 
 ## 9. Responsive Strategy
 
-**Breakpoint**: `680px`
+Primary breakpoint: `680px`.
 
-| Property | Desktop | Mobile |
-|----------|---------|--------|
-| Feature grid | 3 columns | 1 column |
-| Orbital field | `min(58vh, 62vw, 620px)` | `min(42vh, 82vw)` |
-| Search box width | `min(68vw, 760px)` | `100%` |
-| Icon sizes | 26–28px | 22–24px |
-| Shell padding | `clamp(20px, 3vw, 38px)` | 18px |
-| Shell radius | 24px | 20px |
+| Surface | Desktop | Mobile |
+|---------|---------|--------|
+| Settings | 220px nav plus detail panel | Horizontal scrolling nav above detail |
+| Upload | Dual panes with transfer controls | Stacked or compressed pane layout |
+| Chat | Messages plus sources panel | Sources collapse to preserve message space |
+| Search | Search and results share stage | Full-width search and stacked results |
+| Topbar | Logo, mode tabs, model status, settings | Controls wrap or compact as needed |
 
-## 10. Key Design Principles
+Stable dimensions are preferred for repeated rows, icon controls, badges, and status areas so text and loading states do not shift the layout.
 
-1. **No hard edges** — everything is rounded, translucent, soft
-2. **Depth via shadow stacking** — multiple box-shadows + inset highlights
-3. **Fluid by default** — `clamp()` everywhere, no fixed breakpoints for spacing
-4. **Decorative background** — orbital field adds visual interest without distraction
-5. **Minimal chrome** — no borders that stand out, no bold colors, just subtle purple accents
-6. **Accessibility** — `aria-hidden` on decorative elements, `aria-label` on sections
+## 10. Design Principles and Icon System
 
-## 11. Icon System
+1. Keep the UI quiet, utilitarian, and search-focused.
+2. Use depth through translucent surfaces and layered shadows.
+3. Use clear hierarchy: primary action, current status, then supporting metadata.
+4. Make ingestion and retrieval state visible without exposing private document content unnecessarily.
+5. Keep controls accessible with labels, roles, and keyboard-friendly native inputs.
+6. Prefer consistent local patterns over introducing new visual systems.
 
-- **Library**: `lucide-react`
-- **Icons used**: `Search`, `Settings`, `Shield`, `Sparkles`, `Layers`
-- **Styling**: icons inherit `color` via `currentColor`, sized via `size` prop (20px)
-- **CSS targets** `svg` directly for stroke properties (`fill: none`, `stroke-width: 2`)
+- Library: `lucide-react`.
+- Common icons include `Search`, `Settings`, `Database`, `Server`, `Zap`, `Save`, `RefreshCw`, `AlertCircle`, and `X`.
+- Icons inherit color through `currentColor`.
+- CSS targets `svg` for consistent `fill: none`, rounded line caps, and `stroke-width: 2`.
+- Use icons inside action buttons when the icon has a familiar meaning.
+
+## 11. Chat Interface
+
+| Component | Description |
+|-----------|-------------|
+| `ChatPanel` | Main chat container with message area, sources panel, and footer input. |
+| `ChatInput` | Text input and send action for user prompts. |
+| `MessageList` | Scrollable message list for user and assistant turns. |
+| `SourcesPanel` | Collapsible panel showing retrieved chunks and rewrite status. |
+| `ModelStatusBar` | Compact status pills for embedding, LLM, and VectorDB settings. |
+
+Visual rules:
+
+- Chat uses a glass panel aligned to the application shell.
+- User messages are visually distinct from assistant messages through alignment and bubble treatment.
+- Assistant messages support streaming state and error state without changing row structure.
+- Source cards show document name, chunk index, score, and preview text.
+- Inline citations such as `[Source 1]` should remain readable and visually tied to `SourcesPanel`.
+- The input footer remains easy to reach and should not overlap messages or sources.
+
+## 12. Upload & Transfer Interface
+
+| Component | Description |
+|-----------|-------------|
+| `UploadBox` | Owns file loading, transfer state, selections, and job polling. |
+| `FileDropZone` | Compact drag-and-drop area for accepted files. |
+| `TransferPane` | Left or right file list with search and selection. |
+| `FileTransferRow` | Individual file row with icon, metadata, selection, and status. |
+| `TransferControls` | Move selected files between panes. |
+| `EmbedActionBar` | Summarizes selected knowledge-base files and starts embedding. |
+
+Visual rules:
+
+- Left pane represents available uploaded files.
+- Right pane represents the knowledge base queue or indexed set.
+- Status badges communicate pending, embedding, completed, and failed states.
+- Active stages such as parsing, chunking, embedding, and indexing use progress treatment.
+- Failed rows must keep the retry or return path clear.
+- Upload errors should appear near the upload workflow rather than in global chrome.
+
+## 13. Settings Page
+
+| Component | Description |
+|-----------|-------------|
+| Settings nav | Vertical tab navigation for configuration categories. |
+| Provider cards | Radio-selectable provider choices with icon and mode badge. |
+| Model cards | Radio-selectable model rows populated from Ollama when applicable. |
+| Form fields | Text, URL, password, number, select, range, and checkbox inputs. |
+| Warning banners | Privacy and validation warnings for external API usage. |
+| Save button | Primary action with loading and saved/error feedback. |
+
+Visual rules:
+
+- Desktop uses a two-column layout: navigation left, content right.
+- Mobile uses a horizontal scrolling settings nav.
+- Provider mode badges distinguish local and remote options.
+- External API setup uses a warning banner because prompts and context leave the local machine.
+- API keys are described as stored encrypted on the local server and masked after saving.
+- Success and error save messages use the same `.setup-message` system as validation feedback.
+
+## 14. Search Results & Ontology Map
+
+| Component | Description |
+|-----------|-------------|
+| `SearchResults` | Coordinates result list, selected state, detail panel, and map. |
+| `ResultPanel` | Detail preview for a selected search result. |
+| `OntologyMap` | Interactive node-link visualization for search result relationships. |
+
+Visual rules:
+
+- Result cards show document name, chunk preview, and relevance score.
+- Selected result state should be obvious without overpowering the map.
+- The ontology map represents chunks or documents as circular nodes connected by relationship lines.
+- Hover and focus states should expose interactivity while preserving map readability.
+- Empty search states should be helpful and concise.
+
+## 15. CSS File Organization
+
+CSS is co-located with components.
+
+```text
+src/
+  index.css                # Global base styles
+  App.css                  # App shell, landing, search-stage styles
+  components/
+    SettingsPage.jsx
+    SettingsPage.css
+    ChatPanel.jsx
+    ChatPanel.css
+```
+
+Rules:
+
+- Keep one CSS file per substantial component.
+- Place component CSS next to its JSX file.
+- Keep global reset, fonts, and base page styles in `index.css`.
+- Keep shell and route-level layout styles in `App.css`.
+- Put responsive rules in the same CSS file as the component they affect.
+- Avoid inline styles unless a value is genuinely dynamic.

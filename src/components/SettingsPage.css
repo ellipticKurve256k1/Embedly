@@ -383,6 +383,12 @@
   background: rgba(255, 246, 248, 0.82);
 }
 
+.setup-message.is-success {
+  border-color: rgba(52, 148, 111, 0.24);
+  color: #27745b;
+  background: rgba(242, 253, 248, 0.82);
+}
+
 .setup-message svg {
   width: 20px;
   height: 20px;

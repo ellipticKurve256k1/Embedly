@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Search, Settings, LoaderCircle } from 'lucide-react';
 import logoSrc from '../ref/embedly.png';
 import {
+  initializeSettings,
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
@@ -25,6 +26,8 @@ export default function App() {
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
   const [llmSetup, setLlmSetup] = useState(() => readSavedLlmSetup());
   const [vectorDbSetup, setVectorDbSetup] = useState(() => readSavedVectorDbSetup());
+  const [settingsStatus, setSettingsStatus] = useState('loading');
+  const [settingsError, setSettingsError] = useState('');
 
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState(null);
@@ -32,18 +35,50 @@ export default function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
 
+  const refreshConfiguredSettings = useCallback(() => {
+    setEmbeddingSetup(readSavedEmbeddingSetup());
+    setLlmSetup(readSavedLlmSetup());
+    setVectorDbSetup(readSavedVectorDbSetup());
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    initializeSettings()
+      .then(() => {
+        if (!isMounted) return;
+        refreshConfiguredSettings();
+        setSettingsStatus('ready');
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setSettingsError(error instanceof Error ? error.message : 'Unable to load settings.');
+        setSettingsStatus('error');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshConfiguredSettings]);
+
   useEffect(() => {
     const handleHashChange = () => {
       setPage(window.location.hash === '#settings' ? 'settings' : 'search');
       setMode('chat');
-      setEmbeddingSetup(readSavedEmbeddingSetup());
-      setLlmSetup(readSavedLlmSetup());
-      setVectorDbSetup(readSavedVectorDbSetup());
+      refreshConfiguredSettings();
+    };
+
+    const handleSettingsChange = () => {
+      refreshConfiguredSettings();
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+    window.addEventListener('embeddly:settings-changed', handleSettingsChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('embeddly:settings-changed', handleSettingsChange);
+    };
+  }, [refreshConfiguredSettings]);
 
   const handleSearch = useCallback(async (queryText) => {
     const trimmedQuery = queryText.trim();
@@ -84,6 +119,27 @@ export default function App() {
     setSelectedResult(null);
     setSearchError('');
   }, []);
+
+  if (settingsStatus !== 'ready') {
+    return (
+      <main className="app">
+        <section className="landing-shell" aria-label="Embeddly">
+          <header className="topbar">
+            <img className="brand-logo" src={logoSrc} alt="Embeddly" />
+          </header>
+          <div className="search-stage">
+            <div className="search-empty" role={settingsStatus === 'error' ? 'alert' : 'status'}>
+              <p>
+                {settingsStatus === 'error'
+                  ? `Settings could not be loaded. ${settingsError}`
+                  : 'Loading settings...'}
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (page === 'settings') {
     return <SettingsPage />;
