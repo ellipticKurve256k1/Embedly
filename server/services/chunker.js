@@ -24,7 +24,7 @@ function charactersToTokens(characters) {
   return Math.max(1, Math.ceil(characters / AVERAGE_CHARS_PER_TOKEN));
 }
 
-function normalizeConfig(config = {}) {
+export function normalizeConfig(config = {}) {
   const input = config && typeof config === 'object' ? config : {};
   const strategy = ['recursive', 'paragraph', 'fixed'].includes(input.strategy)
     ? input.strategy
@@ -79,7 +79,7 @@ function normalizeConfig(config = {}) {
   };
 }
 
-function normalizeText(text) {
+export function normalizeText(text) {
   return text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
@@ -88,7 +88,7 @@ function normalizeText(text) {
     .trim();
 }
 
-function estimateTokens(content) {
+export function estimateTokens(content) {
   return Math.max(1, Math.ceil(content.length / AVERAGE_CHARS_PER_TOKEN));
 }
 
@@ -99,7 +99,7 @@ function splitByMarkdownSections(text) {
     .filter(Boolean);
 }
 
-function splitByParagraphs(text) {
+export function splitByParagraphs(text) {
   return text
     .replace(/\n(?=#{1,6}\s+)/g, '\n\n')
     .split(/\n{2,}/)
@@ -107,7 +107,7 @@ function splitByParagraphs(text) {
     .filter(Boolean);
 }
 
-function splitBySentences(text) {
+export function splitBySentences(text) {
   const sentences = text.match(/[^.!?]+[.!?]+(?:["')\]]+)?|[^.!?]+$/g) ?? [text];
 
   return sentences
@@ -203,7 +203,10 @@ function getOverlapFromChunk(chunk, overlapTokens) {
   return chunk.slice(boundary > -1 ? boundary + 1 : start).trim();
 }
 
-function mergeSemanticUnits(units, config) {
+export function mergeSemanticUnits(units, config) {
+  const normalizedConfig = typeof config === 'number'
+    ? normalizeConfig({ targetTokens: charactersToTokens(config), maxTokens: charactersToTokens(config) })
+    : normalizeConfig(config);
   const chunks = [];
   let current = '';
 
@@ -220,12 +223,12 @@ function mergeSemanticUnits(units, config) {
   for (const unit of units) {
     const candidate = current ? `${current}\n\n${unit}` : unit;
 
-    if (estimateTokens(candidate) <= config.targetTokens) {
+    if (estimateTokens(candidate) <= normalizedConfig.targetTokens) {
       current = candidate;
       continue;
     }
 
-    if (current && estimateTokens(candidate) <= config.maxTokens) {
+    if (current && estimateTokens(candidate) <= normalizedConfig.maxTokens) {
       current = candidate;
       flushCurrent();
       continue;
@@ -235,8 +238,8 @@ function mergeSemanticUnits(units, config) {
       flushCurrent();
     }
 
-    if (estimateTokens(unit) > config.maxTokens) {
-      for (const splitUnit of splitByCharacterWindow(unit, tokensToCharacters(config.maxTokens))) {
+    if (estimateTokens(unit) > normalizedConfig.maxTokens) {
+      for (const splitUnit of splitByCharacterWindow(unit, tokensToCharacters(normalizedConfig.maxTokens))) {
         current = splitUnit;
         flushCurrent();
       }
@@ -250,7 +253,10 @@ function mergeSemanticUnits(units, config) {
   return chunks;
 }
 
-function compactSmallChunks(chunks, config) {
+export function compactSmallChunks(chunks, config) {
+  const normalizedConfig = typeof config === 'number'
+    ? normalizeConfig({ minTokens: charactersToTokens(config), targetTokens: charactersToTokens(config * 2) })
+    : normalizeConfig(config);
   const compacted = [];
 
   for (const chunk of chunks) {
@@ -258,8 +264,8 @@ function compactSmallChunks(chunks, config) {
 
     if (
       previous
-      && estimateTokens(chunk) < config.minTokens
-      && estimateTokens(`${previous}\n\n${chunk}`) <= config.maxTokens
+      && estimateTokens(chunk) < normalizedConfig.minTokens
+      && estimateTokens(`${previous}\n\n${chunk}`) <= normalizedConfig.maxTokens
     ) {
       compacted[compacted.length - 1] = `${previous}\n\n${chunk}`;
       continue;
@@ -268,7 +274,7 @@ function compactSmallChunks(chunks, config) {
     compacted.push(chunk);
   }
 
-  return compacted.filter((chunk) => estimateTokens(chunk) >= config.minTokens || compacted.length === 1);
+  return compacted.filter((chunk) => estimateTokens(chunk) >= normalizedConfig.minTokens || compacted.length === 1);
 }
 
 function applyChunkOverlap(chunks, config) {

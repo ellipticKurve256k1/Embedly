@@ -258,9 +258,13 @@ Server utilities:
 
 ## 12. Testing Approach
 
-Current automated tests use Node's built-in test runner:
+Automated tests use Node's built-in test runner with co-located `*.test.js` files:
 
 ```text
+npm test
+npm run test:server
+npm run test:services
+npm run test:coverage
 npm run test:filename
 ```
 
@@ -270,7 +274,7 @@ Build verification:
 npm run build
 ```
 
-Test files live next to the source they cover, such as `server/lib/filename.test.js`. Broader integration and browser tests are not yet implemented, so UI workflows still require manual verification through the dev server.
+Test files live next to the source they cover, such as `server/services/chunker.test.js`, `server/routes/routes.test.js`, and `src/lib/api.test.js`. Route tests use an in-process Express dispatcher so they do not need to bind a local port. React component tests are not yet implemented, so full UI workflows still require manual verification through the dev server.
 
 ## 13. Configuration & Environment
 

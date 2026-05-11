@@ -7,6 +7,12 @@
     "dev": "vite",
     "server": "node server/index.js",
     "build": "vite build",
+    "test": "node --test server/**/*.test.js src/**/*.test.js",
+    "test:server": "node --test server/**/*.test.js",
+    "test:services": "node --test server/services/*.test.js",
+    "test:watch": "node --test --watch server/**/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage server/**/*.test.js",
+    "test:verbose": "node --test server/**/*.test.js 2>&1 | grep -E '(tests?|pass|fail)'",
     "test:filename": "node --test server/lib/filename.test.js",
     "preview": "vite preview"
   },

@@ -23,7 +23,7 @@ function decodeUtf8Strict(buffer) {
   return decodeWithEncoding(buffer, 'utf-8', { fatal: true });
 }
 
-function detectBomEncoding(buffer) {
+export function detectBomEncoding(buffer) {
   if (buffer.length >= 3
     && buffer[0] === 0xef
     && buffer[1] === 0xbb
@@ -42,7 +42,7 @@ function detectBomEncoding(buffer) {
   return null;
 }
 
-function detectUtf16ByNullPattern(buffer) {
+export function detectUtf16ByNullPattern(buffer) {
   const sampleLength = Math.min(buffer.length, 512);
   if (sampleLength < 8) return null;
 
@@ -75,7 +75,7 @@ function countMatches(text, pattern) {
   return text.match(pattern)?.length ?? 0;
 }
 
-function scoreDecodedText(text) {
+export function scoreDecodedText(text) {
   if (!text) return Number.POSITIVE_INFINITY;
 
   const length = text.length;
@@ -115,7 +115,7 @@ function decodeLegacyText(buffer) {
   return candidates[0].text;
 }
 
-function decodeTextBuffer(buffer) {
+export function decodeTextBuffer(buffer) {
   const bomEncoding = detectBomEncoding(buffer);
   if (bomEncoding) {
     return decodeWithEncoding(buffer, bomEncoding).normalize('NFC');

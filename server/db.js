@@ -15,7 +15,7 @@ mkdirSync(UPLOAD_DIR, { recursive: true });
 export const db = new Database(DB_PATH);
 db.pragma('foreign_keys = ON');
 
-db.exec(`
+export const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
     filename TEXT NOT NULL,
@@ -72,7 +72,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);
   CREATE INDEX IF NOT EXISTS idx_embeddings_chunk_id ON embeddings(chunk_id);
   CREATE INDEX IF NOT EXISTS idx_jobs_document_id ON embedding_jobs(document_id);
-`);
+`;
+
+export function initializeSchema(database) {
+  database.pragma('foreign_keys = ON');
+  database.exec(SCHEMA_SQL);
+}
+
+initializeSchema(db);
 
 export function nowIso() {
   return new Date().toISOString();

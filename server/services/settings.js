@@ -93,7 +93,7 @@ function parseSettingValue(row) {
   }
 }
 
-function maskApiKey(apiKey) {
+export function maskApiKey(apiKey) {
   const value = String(apiKey ?? '').trim();
   if (!value) {
     return '';

@@ -110,15 +110,16 @@ function formatRewriteHistory(history = []) {
   return formattedLines.join('\n');
 }
 
-function cleanRewriteResponse(value) {
+export function cleanRewriteResponse(value) {
   return cleanText(value)
-    .replace(/^["'`]+|"['`]+$/g, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
     .replace(/^standalone search query:\s*/i, '')
     .replace(/^search query:\s*/i, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
     .trim();
 }
 
-function isValidRetrievalQuery(query) {
+export function isValidRetrievalQuery(query) {
   if (!query || query.length < 3) {
     return false;
   }
@@ -149,7 +150,7 @@ function isValidRetrievalQuery(query) {
   return !invalidPrefixes.some((prefix) => lowerQuery.startsWith(prefix));
 }
 
-function buildContextBlock(chunks = []) {
+export function buildContextBlock(chunks = []) {
   const normalizedChunks = Array.isArray(chunks) ? chunks : [];
   let contextLength = 0;
 
