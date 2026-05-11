@@ -64,12 +64,9 @@ const SourcePopover = forwardRef(function SourcePopover({
   chunk,
   score,
   isCited,
-  isPinned = false,
   placement = 'bottom',
   style,
   onClose,
-  onMouseEnter,
-  onMouseLeave,
 }, ref) {
   const documentName = chunk?.documentName || 'Untitled document';
   const chunkPosition = chunk?.chunkIndex != null ? chunk.chunkIndex + 1 : null;
@@ -85,14 +82,12 @@ const SourcePopover = forwardRef(function SourcePopover({
 
   return (
     <div
-      className={`source-popover source-popover--${placement}${isPinned ? ' is-pinned' : ''}`}
+      className={`source-popover source-popover--${placement}`}
       id={id}
-      role={isPinned ? 'dialog' : 'tooltip'}
+      role="dialog"
       aria-label={`Source ${number} details`}
       ref={ref}
       style={style}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
     >
       <span className="source-popover__header">
         <span className="source-popover__icon" aria-hidden="true">
@@ -103,16 +98,14 @@ const SourcePopover = forwardRef(function SourcePopover({
           {metadata.length > 0 && <small>{metadata.join(' / ')}</small>}
         </span>
         <span className="source-popover__score">{formatScore(score)}</span>
-        {isPinned && (
-          <button
-            className="source-popover__close"
-            type="button"
-            aria-label="Close source details"
-            onClick={onClose}
-          >
-            <X size={14} />
-          </button>
-        )}
+        <button
+          className="source-popover__close"
+          type="button"
+          aria-label="Close source details"
+          onClick={onClose}
+        >
+          <X size={14} />
+        </button>
       </span>
 
       <span className="source-popover__badges">

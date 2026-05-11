@@ -5,7 +5,6 @@ import './SourceChip.css';
 
 const VIEWPORT_PADDING = 12;
 const POPOVER_GAP = 10;
-const PREVIEW_CLOSE_DELAY_MS = 120;
 const DEFAULT_POPOVER_WIDTH = 380;
 const DEFAULT_POPOVER_HEIGHT = 440;
 
@@ -22,7 +21,7 @@ function scoreTone(score) {
 }
 
 export default function SourceChip({ number, chunk, isCited = false, score }) {
-  const [openMode, setOpenMode] = useState(null);
+  const [isOpen, setIsOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({
     top: 0,
     left: 0,
@@ -35,8 +34,7 @@ export default function SourceChip({ number, chunk, isCited = false, score }) {
   const wrapperRef = useRef(null);
   const buttonRef = useRef(null);
   const popoverRef = useRef(null);
-  const closeTimerRef = useRef(null);
-  const tooltipId = useId();
+  const popoverId = useId();
 
   if (!chunk) {
     return <span className="source-chip__fallback">[{number}]</span>;
@@ -45,38 +43,14 @@ export default function SourceChip({ number, chunk, isCited = false, score }) {
   const documentName = chunk.documentName || 'Untitled document';
   const scoreLabel = formatScore(score);
   const tone = scoreTone(score);
-  const isOpen = openMode !== null;
-  const isPinned = openMode === 'pinned';
-
-  const clearCloseTimer = useCallback(() => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  }, []);
 
   const closePopover = useCallback(() => {
-    clearCloseTimer();
-    setOpenMode(null);
-  }, [clearCloseTimer]);
+    setIsOpen(false);
+  }, []);
 
-  const openPreview = useCallback(() => {
-    clearCloseTimer();
-    setOpenMode((currentMode) => (currentMode === 'pinned' ? currentMode : 'preview'));
-  }, [clearCloseTimer]);
-
-  const schedulePreviewClose = useCallback(() => {
-    clearCloseTimer();
-
-    closeTimerRef.current = setTimeout(() => {
-      setOpenMode((currentMode) => (currentMode === 'pinned' ? currentMode : null));
-    }, PREVIEW_CLOSE_DELAY_MS);
-  }, [clearCloseTimer]);
-
-  const togglePinned = useCallback(() => {
-    clearCloseTimer();
-    setOpenMode((currentMode) => (currentMode === 'pinned' ? null : 'pinned'));
-  }, [clearCloseTimer]);
+  const togglePopover = useCallback(() => {
+    setIsOpen((currentOpen) => !currentOpen);
+  }, []);
 
   const updatePopoverPosition = useCallback(() => {
     if (!buttonRef.current || !popoverRef.current) {
@@ -188,35 +162,26 @@ export default function SourceChip({ number, chunk, isCited = false, score }) {
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [closePopover, isOpen]);
 
-  useEffect(() => () => clearCloseTimer(), [clearCloseTimer]);
-
-  const handleKeyDown = (event) => {
-    if (event.key === 'Escape') {
-      closePopover();
-      event.currentTarget.blur();
-    }
-  };
-
-  const handleBlur = (event) => {
-    if (
-      isPinned
-      || wrapperRef.current?.contains(event.relatedTarget)
-      || popoverRef.current?.contains(event.relatedTarget)
-    ) {
-      return;
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
     }
 
-    schedulePreviewClose();
-  };
+    const handleDocumentKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closePopover();
+        buttonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown);
+  }, [closePopover, isOpen]);
 
   return (
     <span
       className="source-chip"
       ref={wrapperRef}
-      onMouseEnter={openPreview}
-      onMouseLeave={schedulePreviewClose}
-      onFocus={openPreview}
-      onBlur={handleBlur}
     >
       <button
         ref={buttonRef}
@@ -232,23 +197,21 @@ export default function SourceChip({ number, chunk, isCited = false, score }) {
           scoreLabel,
           isCited ? 'cited in this answer' : 'retrieved source',
         ].filter(Boolean).join(', ')}
-        aria-describedby={isOpen ? tooltipId : undefined}
-        aria-controls={isOpen ? tooltipId : undefined}
+        aria-describedby={isOpen ? popoverId : undefined}
+        aria-controls={isOpen ? popoverId : undefined}
         aria-expanded={isOpen}
-        onClick={togglePinned}
-        onKeyDown={handleKeyDown}
+        onClick={togglePopover}
       >
         [{number}]
       </button>
       {isOpen && createPortal(
         <SourcePopover
-          id={tooltipId}
+          id={popoverId}
           ref={popoverRef}
           number={number}
           chunk={chunk}
           score={score}
           isCited={isCited}
-          isPinned={isPinned}
           placement={popoverPosition.placement}
           style={{
             top: popoverPosition.top,
@@ -259,8 +222,6 @@ export default function SourceChip({ number, chunk, isCited = false, score }) {
             visibility: popoverPosition.visibility,
           }}
           onClose={closePopover}
-          onMouseEnter={clearCloseTimer}
-          onMouseLeave={schedulePreviewClose}
         />,
         document.body,
       )}
