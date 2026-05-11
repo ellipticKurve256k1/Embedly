@@ -1,4 +1,5 @@
-import { ExternalLink, FileText } from 'lucide-react';
+import { forwardRef } from 'react';
+import { ExternalLink, FileText, X } from 'lucide-react';
 import './SourcePopover.css';
 
 function formatScore(score) {
@@ -43,7 +44,7 @@ function ContextSnippet({ label, chunk, tone = 'muted' }) {
   if (!chunk?.content) {
     return (
       <span className={`source-popover__snippet source-popover__snippet--${tone}`}>
-        <span>{label}</span>
+        <span className="source-popover__snippet-label">{label}</span>
         <span className="source-popover__snippet-text">No adjacent chunk</span>
       </span>
     );
@@ -51,13 +52,25 @@ function ContextSnippet({ label, chunk, tone = 'muted' }) {
 
   return (
     <span className={`source-popover__snippet source-popover__snippet--${tone}`}>
-      <span>{label}</span>
+      <span className="source-popover__snippet-label">{label}</span>
       <span className="source-popover__snippet-text">{chunk.content}</span>
     </span>
   );
 }
 
-export default function SourcePopover({ id, number, chunk, score, isCited }) {
+const SourcePopover = forwardRef(function SourcePopover({
+  id,
+  number,
+  chunk,
+  score,
+  isCited,
+  isPinned = false,
+  placement = 'bottom',
+  style,
+  onClose,
+  onMouseEnter,
+  onMouseLeave,
+}, ref) {
   const documentName = chunk?.documentName || 'Untitled document';
   const chunkPosition = chunk?.chunkIndex != null ? chunk.chunkIndex + 1 : null;
   const totalChunks = chunk?.totalChunks;
@@ -71,7 +84,16 @@ export default function SourcePopover({ id, number, chunk, score, isCited }) {
   ].filter(Boolean);
 
   return (
-    <span className="source-popover" id={id} role="tooltip">
+    <div
+      className={`source-popover source-popover--${placement}${isPinned ? ' is-pinned' : ''}`}
+      id={id}
+      role={isPinned ? 'dialog' : 'tooltip'}
+      aria-label={`Source ${number} details`}
+      ref={ref}
+      style={style}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <span className="source-popover__header">
         <span className="source-popover__icon" aria-hidden="true">
           <FileText size={15} />
@@ -81,6 +103,16 @@ export default function SourcePopover({ id, number, chunk, score, isCited }) {
           {metadata.length > 0 && <small>{metadata.join(' / ')}</small>}
         </span>
         <span className="source-popover__score">{formatScore(score)}</span>
+        {isPinned && (
+          <button
+            className="source-popover__close"
+            type="button"
+            aria-label="Close source details"
+            onClick={onClose}
+          >
+            <X size={14} />
+          </button>
+        )}
       </span>
 
       <span className="source-popover__badges">
@@ -109,6 +141,8 @@ export default function SourcePopover({ id, number, chunk, score, isCited }) {
           View document
         </button>
       </span>
-    </span>
+    </div>
   );
-}
+});
+
+export default SourcePopover;

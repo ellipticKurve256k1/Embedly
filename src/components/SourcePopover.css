@@ -1,10 +1,8 @@
 .source-popover {
-  position: absolute;
-  z-index: 30;
-  bottom: calc(100% + 10px);
-  left: 50%;
+  position: fixed;
+  z-index: 80;
   width: min(380px, calc(100vw - 32px));
-  max-height: min(560px, 72vh);
+  max-height: min(440px, calc(100vh - 32px));
   display: flex;
   flex-direction: column;
   gap: 11px;
@@ -16,31 +14,22 @@
   box-shadow:
     0 18px 44px rgba(72, 83, 138, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
-  transform: translateX(-50%);
   animation: source-popover-enter 140ms ease;
+  overflow: hidden;
 }
 
 .source-popover::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  width: 12px;
-  height: 12px;
-  border-right: 1px solid rgba(132, 146, 184, 0.22);
-  border-bottom: 1px solid rgba(132, 146, 184, 0.22);
-  background: rgba(255, 255, 255, 0.98);
-  transform: translateX(-50%) rotate(45deg);
+  display: none;
 }
 
 @keyframes source-popover-enter {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(4px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 
@@ -97,6 +86,26 @@
   font-weight: 850;
 }
 
+.source-popover__close {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 8px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.source-popover__close:hover,
+.source-popover__close:focus-visible {
+  color: #6258ff;
+  border-color: rgba(98, 88, 255, 0.28);
+}
+
 .source-popover__badges {
   display: flex;
   align-items: center;
@@ -124,7 +133,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 350px;
+  max-height: min(300px, calc(100vh - 190px));
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -137,7 +146,7 @@
   background: rgba(247, 250, 255, 0.72);
 }
 
-.source-popover__snippet span {
+.source-popover__snippet-label {
   display: block;
   margin-bottom: 5px;
   color: #8c96ad;
@@ -204,16 +213,10 @@
 
 @media (max-width: 680px) {
   .source-popover {
-    position: fixed;
     right: 12px;
     bottom: 78px;
     left: 12px;
     width: auto;
     max-height: 62vh;
-    transform: none;
-  }
-
-  .source-popover::after {
-    display: none;
   }
 }
