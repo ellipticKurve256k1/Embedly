@@ -21,6 +21,7 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [retrievedChunks, setRetrievedChunks] = useState([]);
+  const [citedIndices, setCitedIndices] = useState([]);
   const [retrievalQuery, setRetrievalQuery] = useState('');
   const [originalQuery, setOriginalQuery] = useState('');
   const [wasRewritten, setWasRewritten] = useState(false);
@@ -36,6 +37,7 @@ export default function ChatPanel() {
     setMessages([]);
     setConversationId(null);
     setRetrievedChunks([]);
+    setCitedIndices([]);
     setRetrievalQuery('');
     setOriginalQuery('');
     setWasRewritten(false);
@@ -67,6 +69,7 @@ export default function ChatPanel() {
     setChatError('');
     setContextStatus({ type: 'info', message: 'Retrieving relevant chunks...' });
     setRetrievedChunks([]);
+    setCitedIndices([]);
     setRetrievalQuery('');
     setMessages((currentMessages) => [...currentMessages, userMessage, assistantMessage]);
     setIsSearching(true);
@@ -79,21 +82,18 @@ export default function ChatPanel() {
         signal: abortController.signal,
         onContext: (payload) => {
           const chunks = payload?.chunks ?? [];
+          const nextCitedIndices = payload?.citedIndices ?? [];
           setRetrievedChunks(chunks);
+          setCitedIndices(nextCitedIndices);
           setRetrievalQuery(payload?.rewrittenQuery ?? '');
           setOriginalQuery(payload?.originalQuery ?? '');
           setWasRewritten(payload?.wasRewritten ?? false);
           setIsSearching(false);
 
-          // Auto-expand sources panel when chunks arrive
-          if (chunks.length > 0 && sourcesCollapsed) {
-            setSourcesCollapsed(false);
-          }
-
-          // Attach chunks to assistant message for citations
           updateAssistantMessage(assistantMessage.id, (message) => ({
             ...message,
             sourceChunks: chunks,
+            citedIndices: nextCitedIndices,
           }));
 
           if (payload?.error) {
@@ -116,9 +116,24 @@ export default function ChatPanel() {
             content: `${message.content}${content}`,
           }));
         },
+        onCitations: (payload) => {
+          const nextCitedIndices = payload?.citedIndices ?? [];
+          setCitedIndices(nextCitedIndices);
+          updateAssistantMessage(assistantMessage.id, (message) => ({
+            ...message,
+            citedIndices: nextCitedIndices,
+          }));
+        },
         onDone: (payload) => {
           if (payload?.conversationId) {
             setConversationId(payload.conversationId);
+          }
+          if (payload?.citedIndices) {
+            setCitedIndices(payload.citedIndices);
+            updateAssistantMessage(assistantMessage.id, (message) => ({
+              ...message,
+              citedIndices: payload.citedIndices,
+            }));
           }
         },
       });
@@ -144,7 +159,7 @@ export default function ChatPanel() {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [conversationId, isStreaming, sourcesCollapsed, updateAssistantMessage]);
+  }, [conversationId, isStreaming, updateAssistantMessage]);
 
   return (
     <section className="chat-panel" aria-label="Knowledge chat">
@@ -153,6 +168,7 @@ export default function ChatPanel() {
         <SourcesPanel
           isOpen={!sourcesCollapsed}
           chunks={retrievedChunks}
+          citedIndices={citedIndices}
           retrievalQuery={retrievalQuery}
           originalQuery={originalQuery}
           wasRewritten={wasRewritten}

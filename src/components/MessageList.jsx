@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Bot, FileText, LoaderCircle, UserRound } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import { Bot, LoaderCircle, UserRound } from 'lucide-react';
+import SourceChip from './SourceChip.jsx';
+import SourceList from './SourceList.jsx';
 import './MessageList.css';
 
 function formatTime(value) {
@@ -11,50 +13,27 @@ function formatTime(value) {
   }).format(value);
 }
 
-function Citation({ number, chunk }) {
-  const [expanded, setExpanded] = useState(false);
-
-  if (!chunk) {
-    return <span className="citation__fallback">[Source {number}]</span>;
-  }
-
-  return (
-    <span className="citation">
-      <button
-        className={`citation__trigger${expanded ? ' is-expanded' : ''}`}
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-      >
-        [Source {number}]
-        <span className="citation__arrow" aria-hidden="true">{expanded ? '↑' : '↓'}</span>
-      </button>
-      {expanded && (
-        <span className="citation__popup">
-          <span className="citation__header">
-            <FileText size={14} />
-            <strong>{chunk.documentName || 'Untitled document'}</strong>
-            <span>Chunk {chunk.chunkIndex != null ? chunk.chunkIndex + 1 : '—'}</span>
-            <span>{typeof chunk.score === 'number' ? `${Math.round(chunk.score * 100)}%` : ''}</span>
-          </span>
-          <span className="citation__content">{chunk.content || 'No content available.'}</span>
-        </span>
-      )}
-    </span>
-  );
+function extractInlineCitedIndices(content) {
+  const matches = String(content ?? '').matchAll(/\[Source (\d+)\]/g);
+  return Array.from(new Set(
+    Array.from(matches, (match) => Number.parseInt(match[1], 10) - 1)
+      .filter((index) => Number.isInteger(index) && index >= 0),
+  ));
 }
 
-function MessageContent({ content, sourceChunks }) {
+function MessageContent({ content, sourceChunks, citedIndices = [] }) {
+  const mergedCitedIndices = useMemo(() => (
+    Array.from(new Set([
+      ...citedIndices,
+      ...extractInlineCitedIndices(content),
+    ]))
+  ), [content, citedIndices]);
+
   if (!sourceChunks || sourceChunks.length === 0) {
     return <p>{content}</p>;
   }
 
-  // Split content by [Source N] pattern
   const parts = content.split(/(\[Source \d+\])/g);
-
-  if (parts.length <= 1) {
-    return <p>{content}</p>;
-  }
 
   const elements = [];
   for (let i = 0; i < parts.length; i++) {
@@ -64,10 +43,12 @@ function MessageContent({ content, sourceChunks }) {
     if (match) {
       const sourceNum = parseInt(match[1], 10);
       elements.push(
-        <Citation
+        <SourceChip
           key={`citation-${i}`}
           number={sourceNum}
           chunk={sourceChunks[sourceNum - 1]}
+          score={sourceChunks[sourceNum - 1]?.score}
+          isCited={mergedCitedIndices.includes(sourceNum - 1)}
         />
       );
     } else if (part) {
@@ -75,7 +56,12 @@ function MessageContent({ content, sourceChunks }) {
     }
   }
 
-  return <p>{elements}</p>;
+  return (
+    <div className="message-content">
+      <p>{elements.length > 0 ? elements : content}</p>
+      <SourceList chunks={sourceChunks} citedIndices={mergedCitedIndices} />
+    </div>
+  );
 }
 
 export default function MessageList({ messages, isSearching }) {
@@ -133,6 +119,7 @@ export default function MessageList({ messages, isSearching }) {
                     <MessageContent
                       content={message.content}
                       sourceChunks={message.sourceChunks}
+                      citedIndices={message.citedIndices}
                     />
                   ) : (
                     <span className="message__pending">

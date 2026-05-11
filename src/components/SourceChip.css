@@ -1,0 +1,78 @@
+.source-chip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: baseline;
+}
+
+.source-chip__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  margin: 0 2px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #ffffff;
+  background: #6258ff;
+  box-shadow: 0 2px 7px rgba(98, 88, 255, 0.18);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.source-chip__badge--high {
+  background: #27745b;
+  box-shadow: 0 2px 8px rgba(39, 116, 91, 0.18);
+}
+
+.source-chip__badge--medium {
+  background: #6258ff;
+}
+
+.source-chip__badge--low,
+.source-chip__badge--unknown {
+  color: #574cff;
+  background: rgba(98, 88, 255, 0.11);
+  box-shadow: none;
+}
+
+.source-chip__badge.is-cited {
+  border-color: rgba(23, 33, 59, 0.28);
+  box-shadow:
+    0 0 0 2px rgba(39, 116, 91, 0.12),
+    0 3px 10px rgba(39, 116, 91, 0.2);
+}
+
+.source-chip__badge.is-uncited {
+  opacity: 0.72;
+}
+
+.source-chip__badge:hover,
+.source-chip__badge:focus-visible,
+.source-chip__badge.is-open {
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 3px rgba(98, 88, 255, 0.12),
+    0 6px 14px rgba(72, 83, 138, 0.14);
+}
+
+.source-chip__fallback {
+  color: #6258ff;
+  font-weight: 800;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-chip__badge {
+    transition: none;
+  }
+}

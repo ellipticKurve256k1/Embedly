@@ -79,6 +79,8 @@ App
     ModelStatusBar
     ChatPanel (mode: chat)
       MessageList
+      SourceChip
+      SourceList
       SourcesPanel
       ChatInput
     UploadBox (mode: upload)
@@ -214,6 +216,10 @@ App starts
 | `ChatPanel` | `src/components/ChatPanel.jsx` | Owns chat conversation state and streaming lifecycle. |
 | `MessageList` | `src/components/MessageList.jsx` | Renders user and assistant messages. |
 | `SourcesPanel` | `src/components/SourcesPanel.jsx` | Shows retrieved chunks and rewrite status. |
+| `SourceChip` | `src/components/SourceChip.jsx` | Inline citation badge for assistant source references. |
+| `SourcePopover` | `src/components/SourcePopover.jsx` | Hover, focus, and tap source context preview. |
+| `SourceList` | `src/components/SourceList.jsx` | Collapsible source summary below assistant messages. |
+| `SourceItem` | `src/components/SourceItem.jsx` | Individual source row with cited state and document action. |
 | `ChatInput` | `src/components/ChatInput.jsx` | Collects and submits chat prompts. |
 | `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, transfer, selection, and job polling state. |
 | `FileDropZone` | `src/components/FileDropZone.jsx` | Drag-and-drop upload control. |

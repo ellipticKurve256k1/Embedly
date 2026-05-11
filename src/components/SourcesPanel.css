@@ -211,6 +211,12 @@
   border-top: 1px solid rgba(132, 146, 184, 0.14);
 }
 
+.sources-panel__chunk.is-cited {
+  padding-inline: 10px;
+  border-radius: 12px;
+  background: rgba(39, 116, 91, 0.07);
+}
+
 .sources-panel__chunk-top {
   display: flex;
   align-items: center;
@@ -246,6 +252,15 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 1.55;
+}
+
+.sources-panel__chunk .sources-panel__cited-label {
+  display: inline-flex;
+  margin-top: 9px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #27745b;
+  background: rgba(39, 116, 91, 0.1);
 }
 
 .sources-panel__chunk small {

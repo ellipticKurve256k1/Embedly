@@ -96,6 +96,7 @@ export async function streamChatResponse({
   message,
   conversationId,
   onContext,
+  onCitations,
   onToken,
   onDone,
   onError,
@@ -146,6 +147,8 @@ export async function streamChatResponse({
         onToken?.(data.content ?? '');
       } else if (event === 'context') {
         onContext?.(data);
+      } else if (event === 'citations') {
+        onCitations?.(data);
       } else if (event === 'done') {
         onDone?.(data);
       } else if (event === 'error') {
@@ -162,6 +165,8 @@ export async function streamChatResponse({
       onDone?.(data);
     } else if (event === 'context') {
       onContext?.(data);
+    } else if (event === 'citations') {
+      onCitations?.(data);
     }
   }
 }

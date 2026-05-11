@@ -159,6 +159,8 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 | `MessageList` | Scrollable message list for user and assistant turns. |
 | `SourcesPanel` | Collapsible panel showing retrieved chunks and rewrite status. |
 | `ModelStatusBar` | Compact status pills for embedding, LLM, and VectorDB settings. |
+| `SourceChip` | Inline source citation badge inside assistant messages. |
+| `SourceList` | Collapsible per-message source summary below assistant answers. |
 
 Visual rules:
 
@@ -167,6 +169,9 @@ Visual rules:
 - Assistant messages support streaming state and error state without changing row structure.
 - Source cards show document name, chunk index, score, and preview text.
 - Inline citations such as `[Source 1]` should remain readable and visually tied to `SourcesPanel`.
+- Inline source chips replace raw citation text when source data is available.
+- Source popovers show document metadata, adjacent chunk context, and a document navigation action.
+- Per-message source lists are collapsed by default and distinguish cited chunks from retrieved-only chunks.
 - The input footer remains easy to reach and should not overlap messages or sources.
 
 ## 12. Upload & Transfer Interface

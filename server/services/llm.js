@@ -220,6 +220,20 @@ export function buildChatMessages({ message, history = [], chunks = [] }) {
   ];
 }
 
+export function detectCitedSources(response, chunks = []) {
+  const content = String(response ?? '');
+  const normalizedChunks = Array.isArray(chunks) ? chunks : [];
+
+  return normalizedChunks.reduce((indices, _chunk, index) => {
+    const citationPattern = new RegExp(`\\[Source\\s*${index + 1}\\]`, 'i');
+    if (citationPattern.test(content)) {
+      indices.push(index);
+    }
+
+    return indices;
+  }, []);
+}
+
 export async function rewriteRetrievalQuery({
   provider = 'ollama',
   model,

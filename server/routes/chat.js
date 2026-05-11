@@ -1,7 +1,12 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_EMBEDDING_MODEL } from '../services/embedder.js';
-import { buildChatMessages, rewriteRetrievalQuery, streamChat } from '../services/llm.js';
+import {
+  buildChatMessages,
+  detectCitedSources,
+  rewriteRetrievalQuery,
+  streamChat,
+} from '../services/llm.js';
 import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
 import { getEmbeddingSetup, getLlmSetup, isMaskedApiKey } from '../services/settings.js';
 
@@ -188,6 +193,7 @@ router.post('/', async (request, response) => {
           rewrittenQuery: message,
           wasRewritten: false,
           chunks: [],
+          citedIndices: [],
           error: error instanceof Error ? error.message : 'Context retrieval failed.',
         });
         response.end();
@@ -204,6 +210,7 @@ router.post('/', async (request, response) => {
         rewrittenQuery: retrievalQuery,
         wasRewritten: false,
         chunks: chunks.map(toContextChunk),
+        citedIndices: [],
       });
     } else {
       writeSse(response, 'context', {
@@ -211,6 +218,7 @@ router.post('/', async (request, response) => {
         rewrittenQuery: retrievalQuery,
         wasRewritten: rewriteUsed,
         chunks: chunks.map(toContextChunk),
+        citedIndices: [],
       });
     }
 
@@ -231,7 +239,9 @@ router.post('/', async (request, response) => {
     }
 
     saveConversationTurn(conversationId, message, assistantContent);
-    writeSse(response, 'done', { conversationId });
+    const citedIndices = detectCitedSources(assistantContent, chunks);
+    writeSse(response, 'citations', { citedIndices });
+    writeSse(response, 'done', { conversationId, citedIndices });
 
     console.info('chat timing', {
       provider,

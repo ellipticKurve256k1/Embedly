@@ -4,6 +4,7 @@ import {
   buildChatMessages,
   buildContextBlock,
   cleanRewriteResponse,
+  detectCitedSources,
   isValidRetrievalQuery,
   rewriteRetrievalQuery,
   streamChat,
@@ -84,6 +85,19 @@ test('buildChatMessages includes retrieved context', () => {
   });
   assert.match(messages[0].content, /Private notes/);
   assert.match(messages[0].content, /Source 1/);
+});
+
+test('detectCitedSources returns cited source indices', () => {
+  const result = detectCitedSources(
+    'Alpha [Source 1]. Beta [Source 3].',
+    [{}, {}, {}],
+  );
+
+  assert.deepEqual(result, [0, 2]);
+});
+
+test('detectCitedSources handles missing citations', () => {
+  assert.deepEqual(detectCitedSources('No citations here.', [{}, {}]), []);
 });
 
 test('rewriteRetrievalQuery returns original message with empty history', async () => {

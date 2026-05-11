@@ -98,6 +98,7 @@ test('streamChatResponse emits context, tokens, and done events', async () => {
     body: ReadableStream.from([
       Buffer.from('event: context\ndata: {"chunks":[]}\n\n'),
       Buffer.from('event: token\ndata: {"content":"Hi"}\n\n'),
+      Buffer.from('event: citations\ndata: {"citedIndices":[0]}\n\n'),
       Buffer.from('event: done\ndata: {"ok":true}\n\n'),
     ]),
   });
@@ -107,12 +108,14 @@ test('streamChatResponse emits context, tokens, and done events', async () => {
     conversationId: 'c1',
     onContext: (data) => events.push(['context', data]),
     onToken: (content) => events.push(['token', content]),
+    onCitations: (data) => events.push(['citations', data]),
     onDone: (data) => events.push(['done', data]),
   });
 
   assert.deepEqual(events, [
     ['context', { chunks: [] }],
     ['token', 'Hi'],
+    ['citations', { citedIndices: [0] }],
     ['done', { ok: true }],
   ]);
 });

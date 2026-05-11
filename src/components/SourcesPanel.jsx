@@ -6,7 +6,18 @@ function formatScore(score) {
   return `${Math.round(score * 100)}%`;
 }
 
-export default function SourcesPanel({ isOpen, chunks, retrievalQuery, originalQuery, wasRewritten, status, onClose }) {
+export default function SourcesPanel({
+  isOpen,
+  chunks,
+  citedIndices = [],
+  retrievalQuery,
+  originalQuery,
+  wasRewritten,
+  status,
+  onClose,
+}) {
+  const citedSet = new Set(citedIndices);
+
   return (
     <aside className={`sources-panel${isOpen ? ' is-open' : ''}`} aria-label="Retrieved context">
       {isOpen ? (
@@ -53,12 +64,18 @@ export default function SourcesPanel({ isOpen, chunks, retrievalQuery, originalQ
               </div>
             ) : (
               chunks.map((chunk, index) => (
-                <article className="sources-panel__chunk" key={chunk.chunkId ?? index}>
+                <article
+                  className={`sources-panel__chunk${citedSet.has(index) ? ' is-cited' : ''}`}
+                  key={chunk.chunkId ?? index}
+                >
                   <div className="sources-panel__chunk-top">
                     <FileText size={16} />
                     <strong>{chunk.documentName || 'Untitled document'}</strong>
                     <span>{formatScore(chunk.score)}</span>
                   </div>
+                  {citedSet.has(index) && (
+                    <small className="sources-panel__cited-label">Cited in answer</small>
+                  )}
                   <p>
                     {chunk.preview || chunk.content
                       ? (chunk.preview ?? `${chunk.content.slice(0, 260)}${chunk.content.length > 260 ? '...' : ''}`)
