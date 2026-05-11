@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Search, Settings, LoaderCircle } from 'lucide-react';
-import logoSrc from '../ref/embedly.png';
+import logoSrc from '../references/embedly.png';
 import {
   initializeSettings,
   readSavedEmbeddingSetup,

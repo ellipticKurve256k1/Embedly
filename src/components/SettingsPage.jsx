@@ -12,7 +12,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import logoSrc from '../../ref/embedly.png';
+import logoSrc from '../../references/embedly.png';
 import {
   readSavedEmbeddingSetup,
   readSavedChunkingConfig,

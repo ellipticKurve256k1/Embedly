@@ -38,7 +38,7 @@ embedly/
     lib/                       # Server utilities and tests
     db.js                      # SQLite schema and database helpers
     index.js                   # Server entry point
-  ref/                         # Reference images and proposals
+  references/                  # Reference images and proposals
   DESIGN.md                    # Visual design system
   CODEBASE.md                  # Architecture and codebase guide
   Agents.md                    # Agent instructions
