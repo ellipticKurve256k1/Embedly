@@ -4,6 +4,7 @@ Agents.md
 .DS_Store
 package-lock.json
 dist
+.env
 TODO.md
 server/uploads/
 server/*.db
