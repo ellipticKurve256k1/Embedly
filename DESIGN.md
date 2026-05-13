@@ -1,6 +1,6 @@
 # Embeddly Design System
 
-Last updated: 2026-05-11
+Last updated: 2026-05-13
 
 ## 1. Layout Architecture
 
@@ -154,7 +154,9 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 
 | Component | Description |
 |-----------|-------------|
-| `ChatPanel` | Main chat container with message area, sources panel, and footer input. |
+| `ChatPanel` | Main chat container with conversation sidebar, message area, sources panel, and footer input. |
+| `ChatSidebar` | Collapsible conversation history rail with new-chat, rename, delete, and count controls. |
+| `ChatSessionItem` | Conversation row or icon-only collapsed item with active and rename states. |
 | `ChatInput` | Text input and send action for user prompts. |
 | `MessageList` | Scrollable message list for user and assistant turns. |
 | `SourcesPanel` | Collapsible panel showing retrieved chunks and rewrite status. |
@@ -165,6 +167,9 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 Visual rules:
 
 - Chat uses a glass panel aligned to the application shell.
+- The conversation sidebar is 260px when expanded and a 44px icon rail when collapsed.
+- Collapsed sidebar items expose titles through hover tooltips and keep the active conversation visibly highlighted.
+- Mobile treats the expanded sidebar as a left overlay drawer while preserving a narrow access rail.
 - User messages are visually distinct from assistant messages through alignment and bubble treatment.
 - Assistant messages support streaming state and error state without changing row structure.
 - Source cards show document name, chunk index, score, and preview text.

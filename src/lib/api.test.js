@@ -93,7 +93,10 @@ test('uploadFiles sends FormData payload', async () => {
 
 test('streamChatResponse emits context, tokens, and done events', async () => {
   const events = [];
-  global.fetch = async () => ({
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    assert.deepEqual(body.history, [{ role: 'user', content: 'previous' }]);
+    return ({
     ok: true,
     body: ReadableStream.from([
       Buffer.from('event: context\ndata: {"chunks":[]}\n\n'),
@@ -101,11 +104,13 @@ test('streamChatResponse emits context, tokens, and done events', async () => {
       Buffer.from('event: citations\ndata: {"citedIndices":[0]}\n\n'),
       Buffer.from('event: done\ndata: {"ok":true}\n\n'),
     ]),
-  });
+    });
+  };
 
   await streamChatResponse({
     message: 'hello',
     conversationId: 'c1',
+    history: [{ role: 'user', content: 'previous' }],
     onContext: (data) => events.push(['context', data]),
     onToken: (content) => events.push(['token', content]),
     onCitations: (data) => events.push(['citations', data]),

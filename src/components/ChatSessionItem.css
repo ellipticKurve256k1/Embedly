@@ -1,0 +1,110 @@
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #59657e;
+  cursor: pointer;
+  outline: 0;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.session-item:hover,
+.session-item:focus-visible {
+  color: #574cff;
+  background: rgba(98, 88, 255, 0.06);
+}
+
+.session-item.is-active {
+  color: #4036e4;
+  border-color: rgba(98, 88, 255, 0.24);
+  background: rgba(98, 88, 255, 0.1);
+  box-shadow: inset 3px 0 0 #6258ff;
+}
+
+.session-item.is-collapsed {
+  width: 30px;
+  height: 34px;
+  min-height: 34px;
+  justify-content: center;
+  padding: 0;
+}
+
+.session-item__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.session-item__title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item__rename-input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border: 1px solid rgba(98, 88, 255, 0.28);
+  border-radius: 8px;
+  outline: 0;
+  padding: 6px 7px;
+  color: #17213b;
+  background: rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.session-item__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.session-item:hover .session-item__actions,
+.session-item:focus-within .session-item__actions,
+.session-item.is-active .session-item__actions {
+  opacity: 1;
+}
+
+.session-item__action-btn {
+  width: 25px;
+  height: 25px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: #7d879d;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.session-item__action-btn:hover,
+.session-item__action-btn:focus-visible {
+  color: #574cff;
+  background: rgba(98, 88, 255, 0.1);
+}
+
+.session-item__action-btn--danger:hover,
+.session-item__action-btn--danger:focus-visible {
+  color: #9f4452;
+  background: rgba(159, 68, 82, 0.1);
+}

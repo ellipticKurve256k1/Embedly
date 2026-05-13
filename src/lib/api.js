@@ -95,6 +95,7 @@ function parseSseMessage(rawMessage) {
 export async function streamChatResponse({
   message,
   conversationId,
+  history,
   onContext,
   onCitations,
   onToken,
@@ -111,6 +112,7 @@ export async function streamChatResponse({
     body: JSON.stringify({
       message,
       conversationId,
+      history: Array.isArray(history) ? history : [],
       llmSetup: llmSetup ?? null,
       embeddingModel: embeddingSetup?.model,
     }),

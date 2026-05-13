@@ -1,6 +1,6 @@
 # Embeddly Codebase
 
-Last updated: 2026-05-11
+Last updated: 2026-05-13
 
 ## 1. Overview
 
@@ -63,6 +63,7 @@ Generated or local runtime data:
 - Mode switching is local React state: chat, upload, and search.
 - `src/lib/api.js` wraps backend calls and SSE parsing.
 - `src/lib/storage.js` loads settings from `/api/settings`, caches them in memory, migrates old Embeddly localStorage settings, and exposes synchronous read helpers.
+- `src/lib/chatDB.js` persists chat conversations and active chat UI state in IndexedDB, with an in-memory fallback when browser storage is unavailable.
 - There is no external frontend state library.
 
 Component hierarchy:
@@ -78,6 +79,8 @@ App
     ModeTabs
     ModelStatusBar
     ChatPanel (mode: chat)
+      ChatSidebar
+        ChatSessionItem
       MessageList
       SourceChip
       SourceList
@@ -107,7 +110,7 @@ Request flow:
 HTTP request -> route handler -> service layer -> SQLite or provider API -> response
 ```
 
-Long-running embedding work currently runs inside the `/api/embed` request path while updating `embedding_jobs`. Chat uses SSE to stream context, tokens, and completion metadata back to the browser.
+Long-running embedding work currently runs inside the `/api/embed` request path while updating `embedding_jobs`. Chat uses SSE to stream context, tokens, and completion metadata back to the browser. Client-side chat history is the source of truth; the server keeps only a short in-memory hot cache and can rehydrate that cache from recent history sent in `/api/chat` requests.
 
 ## 6. Database Schema
 
@@ -118,6 +121,8 @@ Long-running embedding work currently runs inside the `/api/embed` request path 
 | `embeddings` | Vector BLOBs linked to chunks, with model, dimensions, timestamp. |
 | `embedding_jobs` | Per-document embedding status, model, total chunks, processed chunks, error, timestamps. |
 | `settings` | Key-value settings rows with JSON value, encryption flag, and update timestamp. |
+
+Chat conversations are not stored in SQLite. The browser stores up to 30 conversations in IndexedDB under the `embeddly-chat` database, and each saved conversation keeps up to 30 messages.
 
 Important relationships:
 
@@ -147,7 +152,7 @@ Settings keys:
 | `/api/jobs` | GET | List embedding jobs. |
 | `/api/jobs/:id` | GET | Fetch one embedding job. |
 | `/api/search` | GET | Run semantic search for `q`, optionally with `model`. |
-| `/api/chat` | POST | Stream RAG chat response over SSE. |
+| `/api/chat` | POST | Stream RAG chat response over SSE; accepts optional recent `history` to recover the server hot cache. |
 | `/api/settings` | GET | Return all persisted settings with API keys masked. |
 | `/api/settings/:key` | GET | Return one public setting key. |
 | `/api/settings` | POST | Upsert settings, encrypting API-key settings. |
@@ -186,13 +191,17 @@ Chat:
 
 ```text
 User sends message
+  -> frontend loads or creates an active IndexedDB conversation
+  -> frontend sends message, conversationId, and recent history to POST /api/chat
   -> POST /api/chat
   -> server resolves saved or request-provided LLM settings
+  -> server uses its hot cache or rehydrates it from request history
   -> retrieval finds context chunks
   -> follow-up queries may be rewritten with recent conversation
   -> messages are built with source instructions
   -> LLM response streams as SSE tokens
   -> frontend updates MessageList and SourcesPanel
+  -> final conversation is saved back to IndexedDB
 ```
 
 Settings:
@@ -213,7 +222,9 @@ App starts
 | `App` | `src/App.jsx` | Root routing, mode switching, settings initialization. |
 | `ModeTabs` | `src/components/ModeTabs.jsx` | Switches between chat, upload, and search modes. |
 | `ModelStatusBar` | `src/components/ModelStatusBar.jsx` | Shows configured embedding, generation, and vector DB state. |
-| `ChatPanel` | `src/components/ChatPanel.jsx` | Owns chat conversation state and streaming lifecycle. |
+| `ChatPanel` | `src/components/ChatPanel.jsx` | Owns active chat state, IndexedDB persistence, sidebar actions, and streaming lifecycle. |
+| `ChatSidebar` | `src/components/ChatSidebar.jsx` | Collapsible conversation list with new-chat, rename, delete, and storage status controls. |
+| `ChatSessionItem` | `src/components/ChatSessionItem.jsx` | Individual conversation row with active, collapsed, rename, and delete affordances. |
 | `MessageList` | `src/components/MessageList.jsx` | Renders user and assistant messages. |
 | `SourcesPanel` | `src/components/SourcesPanel.jsx` | Shows retrieved chunks and rewrite status. |
 | `SourceChip` | `src/components/SourceChip.jsx` | Inline citation badge for assistant source references. |

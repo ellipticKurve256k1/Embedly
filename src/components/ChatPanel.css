@@ -15,36 +15,20 @@
   overflow: hidden;
 }
 
+.chat-panel__conversation {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .chat-panel__footer {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 14px clamp(0px, 2vw, 20px) 0;
-}
-
-.chat-panel__new-btn {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid rgba(132, 146, 184, 0.2);
-  border-radius: 12px;
-  color: #65718b;
-  background: rgba(255, 255, 255, 0.96);
-  cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease;
-}
-
-.chat-panel__new-btn:hover:not(:disabled) {
-  color: #6258ff;
-  border-color: rgba(98, 88, 255, 0.3);
-}
-
-.chat-panel__new-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .chat-panel__error {
@@ -60,7 +44,88 @@
   line-height: 1.4;
 }
 
+.chat-panel__dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 33, 59, 0.22);
+  backdrop-filter: blur(5px);
+}
+
+.chat-panel__dialog {
+  width: min(360px, 100%);
+  padding: 22px;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 22px 52px rgba(72, 83, 138, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.chat-panel__dialog h2 {
+  margin: 0;
+  color: #17213b;
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.chat-panel__dialog p {
+  margin: 10px 0 0;
+  color: #65718b;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.chat-panel__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.chat-panel__dialog-actions button {
+  min-width: 82px;
+  min-height: 38px;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 10px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.chat-panel__dialog-actions button:hover {
+  color: #574cff;
+  border-color: rgba(98, 88, 255, 0.28);
+}
+
+.chat-panel__dialog-actions .chat-panel__dialog-delete {
+  color: #ffffff;
+  border-color: transparent;
+  background: #9f4452;
+}
+
+.chat-panel__dialog-actions .chat-panel__dialog-delete:hover {
+  color: #ffffff;
+  background: #8f3947;
+}
+
 @media (max-width: 680px) {
+  .chat-panel__conversation {
+    padding-left: 44px;
+  }
+
   .chat-panel__footer {
     padding-top: 10px;
   }

@@ -20,8 +20,39 @@ function writeSse(response, event, data) {
   response.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-function getConversationHistory(conversationId) {
-  return conversations.get(conversationId) ?? [];
+export function sanitizeHistory(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .filter((message) => (
+      message
+      && (message.role === 'user' || message.role === 'assistant')
+      && typeof message.content === 'string'
+      && message.content.trim()
+    ))
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim(),
+    }))
+    .slice(-MAX_HISTORY_MESSAGES);
+}
+
+export function getConversationHistory(conversationId, bodyHistory = []) {
+  if (conversations.has(conversationId)) {
+    return conversations.get(conversationId);
+  }
+
+  const sanitizedHistory = sanitizeHistory(bodyHistory);
+  if (sanitizedHistory.length > 0) {
+    conversations.set(conversationId, sanitizedHistory);
+    return sanitizedHistory;
+  }
+
+  return [];
+}
+
+export function clearConversationCacheForTests() {
+  conversations.clear();
 }
 
 function saveConversationTurn(conversationId, message, assistantContent) {
@@ -75,6 +106,7 @@ router.post('/', async (request, response) => {
   const conversationId = (typeof rawConversationId === 'string' && rawConversationId.trim())
     ? rawConversationId.trim()
     : uuidv4();
+  const bodyHistory = sanitizeHistory(request.body?.history);
 
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -107,7 +139,7 @@ router.post('/', async (request, response) => {
 
   try {
     const startedAt = performance.now();
-    const history = getConversationHistory(conversationId);
+    const history = getConversationHistory(conversationId, bodyHistory);
     let chunks = [];
     let retrievalQuery = message;
     let rewriteUsed = false;
