@@ -256,7 +256,7 @@ User clicks Connect Wallet
 | `ModeTabs` | `src/components/ModeTabs.jsx` | Switches between chat, upload, and search modes. |
 | `ModelStatusBar` | `src/components/ModelStatusBar.jsx` | Shows configured embedding, generation, and vector DB state. |
 | `LoginButton` | `src/components/LoginButton.jsx` | Shows wallet login state and disconnect menu. |
-| `LoginModal` | `src/components/LoginModal.jsx` | Displays LNURL QR code, copy/open-wallet actions, WebLN action, and polling status. |
+| `LoginModal` | `src/components/LoginModal.jsx` | Displays LNURL QR code, copy action, browser-wallet auth action, and polling status. |
 | `ChatPanel` | `src/components/ChatPanel.jsx` | Owns active chat state, IndexedDB persistence, sidebar actions, and streaming lifecycle. |
 | `ChatSidebar` | `src/components/ChatSidebar.jsx` | Collapsible conversation list with new-chat, rename, delete, and storage status controls. |
 | `ChatSessionItem` | `src/components/ChatSessionItem.jsx` | Individual conversation row with active, collapsed, rename, and delete affordances. |

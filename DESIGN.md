@@ -225,7 +225,7 @@ Visual rules:
 | Component | Description |
 |-----------|-------------|
 | `LoginButton` | Topbar control for connecting a Lightning wallet or opening the disconnect menu. |
-| `LoginModal` | Centered glass modal with LNURL QR code, copy/open-wallet actions, WebLN action, status text, and close control. |
+| `LoginModal` | Centered glass modal with LNURL QR code, copy action, browser-wallet action, status text, and close control. |
 
 Visual rules:
 
@@ -234,7 +234,7 @@ Visual rules:
 - Logged-in state displays a truncated wallet public key and a small dropdown with "Disconnect".
 - Modal status text must be concise and fixed-height enough to avoid layout shift while polling.
 - QR code sits in a simple glass frame and remains the primary visual focus.
-- Copy and open-wallet actions stay available even when browser-wallet connection fails.
+- The copy action stays available even when browser-wallet connection fails.
 - The LNURL auth request is visible in a selectable read-only field for manual wallet paste flows.
 
 ## 14. Search Results & Ontology Map

@@ -6,6 +6,7 @@ package-lock.json
 dist
 .env
 TODO.md
+.opencode
 server/uploads/
 server/*.db
 server/*.db-shm

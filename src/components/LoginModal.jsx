@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { init, requestProvider } from '@getalby/bitcoin-connect-react';
-import { Clipboard, ExternalLink, LoaderCircle, X, Zap } from 'lucide-react';
+import { bech32 } from 'bech32';
+import { Clipboard, LoaderCircle, X, Zap } from 'lucide-react';
 import {
   getAuthStatus,
   setSessionToken,
@@ -12,6 +13,34 @@ import './LoginModal.css';
 
 const AUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 2000;
+const LNURL_BECH32_LIMIT = 2000;
+
+function decodeLnurl(lnurl) {
+  const { words } = bech32.decode(lnurl, LNURL_BECH32_LIMIT);
+  return new TextDecoder().decode(Uint8Array.from(bech32.fromWords(words)));
+}
+
+function normalizeSignature(signResult) {
+  if (typeof signResult === 'string') {
+    return signResult.trim();
+  }
+
+  return String(signResult?.signature ?? '').trim();
+}
+
+async function resolveProviderPublicKey(provider) {
+  const directPublicKey = String(provider?.publicKey ?? '').trim();
+  if (directPublicKey) {
+    return directPublicKey;
+  }
+
+  if (typeof provider?.getInfo !== 'function') {
+    return '';
+  }
+
+  const info = await provider.getInfo();
+  return String(info?.node?.pubkey ?? '').trim();
+}
 
 export default function LoginModal({ onClose, onAuthenticated }) {
   const modalRef = useRef(null);
@@ -145,23 +174,45 @@ export default function LoginModal({ onClose, onAuthenticated }) {
     try {
       init({ appName: 'Embeddly' });
       const provider = await requestProvider();
+      const callback = new URL(decodeLnurl(challenge.lnurl));
+      const k1 = callback.searchParams.get('k1');
 
-      if (typeof provider?.lnurl !== 'function') {
-        throw new Error(
-          'This connected wallet does not support LNURL-Auth. Copy the LNURL or scan the QR code.',
-        );
+      if (!k1) {
+        throw new Error('Invalid LNURL: missing k1 parameter.');
       }
 
-      const result = await provider.lnurl(challenge.lnurl);
-      if (result?.status === 'ERROR') {
-        throw new Error(result.reason || 'Wallet rejected the LNURL authentication request.');
+      if (typeof provider?.signMessage !== 'function') {
+        throw new Error('Your wallet does not support LNURL-Auth. Please scan the QR code.');
+      }
+
+      const signature = normalizeSignature(await provider.signMessage(k1));
+      if (!signature) {
+        throw new Error('Wallet did not return a signature. Please scan the QR code.');
+      }
+
+      const publicKey = await resolveProviderPublicKey(provider);
+      if (!publicKey) {
+        throw new Error('Unable to retrieve wallet public key. Please scan the QR code.');
+      }
+
+      callback.searchParams.set('k1', k1);
+      callback.searchParams.set('sig', signature);
+      callback.searchParams.set('key', publicKey);
+
+      const callbackResponse = await fetch(callback.toString());
+      const callbackPayload = await callbackResponse.json().catch(() => ({}));
+
+      if (!callbackResponse.ok || callbackPayload.status === 'ERROR') {
+        throw new Error(
+          callbackPayload.reason || 'Wallet authentication callback failed.',
+        );
       }
 
       setStatus('awaiting_scan');
     } catch (connectError) {
       setError(connectError instanceof Error
         ? connectError.message
-        : 'No WebLN provider found. Copy the LNURL or scan the QR code.');
+        : 'Browser wallet authentication failed. Scan the QR code with your mobile wallet.');
       setStatus('awaiting_scan');
     }
   };
@@ -188,22 +239,12 @@ export default function LoginModal({ onClose, onAuthenticated }) {
     }
   };
 
-  const handleOpenWallet = () => {
-    if (!challenge?.lnurl) {
-      return;
-    }
-
-    setError('');
-    setCopyStatus('');
-    window.location.href = `lightning:${challenge.lnurl}`;
-  };
-
   const statusText = status === 'authenticated'
     ? 'Authenticated.'
     : status === 'loading'
       ? 'Preparing login request...'
       : status === 'connecting_wallet'
-        ? 'Waiting for browser wallet...'
+        ? 'Opening wallet and signing challenge...'
         : error || copyStatus || 'Waiting for wallet scan...';
   const canUseChallenge = Boolean(challenge?.lnurl);
   const isConnectingWallet = status === 'connecting_wallet';
@@ -241,15 +282,6 @@ export default function LoginModal({ onClose, onAuthenticated }) {
         </p>
 
         <div className="login-modal__actions">
-          <button
-            className="login-modal__secondary-action"
-            type="button"
-            onClick={handleOpenWallet}
-            disabled={!canUseChallenge}
-          >
-            <ExternalLink size={17} />
-            <span>Open Wallet</span>
-          </button>
           <button
             className="login-modal__secondary-action"
             type="button"
