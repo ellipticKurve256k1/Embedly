@@ -1,6 +1,6 @@
 # Embeddly Design System
 
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 ## 1. Layout Architecture
 
@@ -22,7 +22,7 @@ Main layouts:
 | Upload | Topbar, mode tabs, drop zone, dual transfer panes | Designed for repeated file triage. |
 | Settings | Topbar, vertical nav, detail panel | Nav collapses to horizontal scroll on mobile. |
 
-The topbar carries the logo, mode switching, configured model status, and settings button. Content surfaces keep a constrained inner rhythm while the outer shell supplies depth and separation.
+The topbar carries the logo, mode switching, configured model status, wallet login control, and settings button. Content surfaces keep a constrained inner rhythm while the outer shell supplies depth and separation.
 
 ## 2. Color Palette
 
@@ -161,6 +161,7 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 | `MessageList` | Scrollable message list for user and assistant turns. |
 | `SourcesPanel` | Collapsible panel showing retrieved chunks and rewrite status. |
 | `ModelStatusBar` | Compact status pills for embedding, LLM, and VectorDB settings. |
+| `LoginButton` | Compact wallet connection state and disconnect menu. |
 | `SourceChip` | Inline source citation badge inside assistant messages. |
 | `SourceList` | Collapsible per-message source summary below assistant answers. |
 
@@ -218,6 +219,23 @@ Visual rules:
 - External API setup uses a warning banner because prompts and context leave the local machine.
 - API keys are described as stored encrypted on the local server and masked after saving.
 - Success and error save messages use the same `.setup-message` system as validation feedback.
+
+## 14. Login Modal
+
+| Component | Description |
+|-----------|-------------|
+| `LoginButton` | Topbar control for connecting a Lightning wallet or opening the disconnect menu. |
+| `LoginModal` | Centered glass modal with LNURL QR code, copy/open-wallet actions, WebLN action, status text, and close control. |
+
+Visual rules:
+
+- Logged-out state uses a compact glass button with a `Zap` icon and "Connect Wallet" label on desktop.
+- Mobile keeps the login control icon-sized to preserve topbar space.
+- Logged-in state displays a truncated wallet public key and a small dropdown with "Disconnect".
+- Modal status text must be concise and fixed-height enough to avoid layout shift while polling.
+- QR code sits in a simple glass frame and remains the primary visual focus.
+- Copy and open-wallet actions stay available even when browser-wallet connection fails.
+- The LNURL auth request is visible in a selectable read-only field for manual wallet paste flows.
 
 ## 14. Search Results & Ontology Map
 

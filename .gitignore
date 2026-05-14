@@ -10,4 +10,7 @@ server/uploads/
 server/*.db
 server/*.db-shm
 server/*.db-wal
+server/*.sqlite
+server/*.sqlite-shm
+server/*.sqlite-wal
 server/.embeddly/key

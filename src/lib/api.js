@@ -3,6 +3,7 @@ import {
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
 } from './storage.js';
+import { getAuthHeaders } from './auth.js';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -22,6 +23,7 @@ export async function uploadFiles(files) {
 
   const response = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
+    headers: getAuthHeaders(),
     body: formData,
   });
 
@@ -29,13 +31,16 @@ export async function uploadFiles(files) {
 }
 
 export async function getDocuments() {
-  const response = await fetch(`${API_BASE}/documents`);
+  const response = await fetch(`${API_BASE}/documents`, {
+    headers: getAuthHeaders(),
+  });
   return parseResponse(response);
 }
 
 export async function deleteDocument(id) {
   const response = await fetch(`${API_BASE}/documents/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
 
   return parseResponse(response);
@@ -45,7 +50,7 @@ export async function startEmbedding(documentIds) {
   const embeddingSetup = readSavedEmbeddingSetup();
   const response = await fetch(`${API_BASE}/embed`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({
       documentIds,
       model: embeddingSetup?.model,
@@ -57,7 +62,9 @@ export async function startEmbedding(documentIds) {
 }
 
 export async function getJobs() {
-  const response = await fetch(`${API_BASE}/jobs`);
+  const response = await fetch(`${API_BASE}/jobs`, {
+    headers: getAuthHeaders(),
+  });
   return parseResponse(response);
 }
 
@@ -69,7 +76,9 @@ export async function searchQuery(query) {
     searchParams.set('model', embeddingSetup.model);
   }
 
-  const response = await fetch(`${API_BASE}/search?${searchParams.toString()}`);
+  const response = await fetch(`${API_BASE}/search?${searchParams.toString()}`, {
+    headers: getAuthHeaders(),
+  });
   return parseResponse(response);
 }
 
@@ -107,7 +116,7 @@ export async function streamChatResponse({
   const embeddingSetup = readSavedEmbeddingSetup();
   const response = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     signal,
     body: JSON.stringify({
       message,

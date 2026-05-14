@@ -18,11 +18,13 @@ import {
   readSavedChunkingConfig,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
+  loadSettings,
   saveChunkingConfig,
   saveEmbeddingSetup,
   saveLlmSetup,
   saveVectorDbSetup,
 } from '../lib/storage.js';
+import LoginButton from './LoginButton';
 import './SettingsPage.css';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -148,6 +150,51 @@ export default function SettingsPage() {
   );
   const ActiveVectorDbSetup = activeVectorDbProvider?.component;
 
+  const syncSettingsFromCache = useCallback(() => {
+    const nextEmbeddingSetup = readSavedEmbeddingSetup();
+    const nextLlmSetup = readSavedLlmSetup();
+    const nextVectorDbSetup = readSavedVectorDbSetup();
+    const nextChunkingConfig = readSavedChunkingConfig();
+
+    setEmbeddingSetup(nextEmbeddingSetup);
+    setSelectedProvider(nextEmbeddingSetup?.provider ?? embeddingProviders[0].id);
+    setSelectedModel(nextEmbeddingSetup?.model ?? '');
+    setIsEditingSetup(!nextEmbeddingSetup);
+
+    setLlmSetup(nextLlmSetup);
+    setSelectedLlmProvider(nextLlmSetup?.provider ?? llmProviders[0].id);
+    setSelectedLlmModel(nextLlmSetup?.model ?? '');
+    setSelectedLlmEndpoint(
+      nextLlmSetup?.endpoint ?? (
+        nextLlmSetup?.provider === 'api' ? DEFAULT_OPENAI_COMPATIBLE_ENDPOINT : OLLAMA_BASE_URL
+      ),
+    );
+    setSelectedLlmApiKey(nextLlmSetup?.apiKey ?? '');
+    setIsEditingLlmSetup(!nextLlmSetup);
+
+    setVectorDbSetup(nextVectorDbSetup);
+    setSelectedVectorDbProvider(nextVectorDbSetup?.provider ?? vectorDbProviders[0].id);
+    setChunkingConfig(nextChunkingConfig);
+  }, []);
+
+  useEffect(() => {
+    const handleSettingsChange = () => {
+      syncSettingsFromCache();
+    };
+
+    const handleAuthChange = () => {
+      loadSettings().catch(() => {});
+    };
+
+    window.addEventListener('embeddly:settings-changed', handleSettingsChange);
+    window.addEventListener('embeddly:auth-changed', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('embeddly:settings-changed', handleSettingsChange);
+      window.removeEventListener('embeddly:auth-changed', handleAuthChange);
+    };
+  }, [syncSettingsFromCache]);
+
   const saveWithStatus = useCallback(async (section, action, successMessage) => {
     setSavingSection(section);
     setSaveStatus({ section: null, type: null, message: '' });
@@ -270,9 +317,12 @@ export default function SettingsPage() {
           <a className="brand-link" href="#/" aria-label="Back to search">
             <img className="brand-logo" src={logoSrc} alt="Embeddly" />
           </a>
-          <a className="icon-button" href="#/" aria-label="Close settings">
-            <X size={20} />
-          </a>
+          <div className="topbar-actions">
+            <LoginButton />
+            <a className="icon-button" href="#/" aria-label="Close settings">
+              <X size={20} />
+            </a>
+          </div>
         </header>
 
         <div className="settings-content">

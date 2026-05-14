@@ -1,6 +1,8 @@
 import cors from 'cors';
 import express from 'express';
 import './db.js';
+import { authContextMiddleware } from './middleware/auth.js';
+import authRouter from './routes/auth.js';
 import chatRouter from './routes/chat.js';
 import documentsRouter from './routes/documents.js';
 import embedRouter from './routes/embed.js';
@@ -14,11 +16,13 @@ const app = express();
 
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '2mb' }));
+app.use(authContextMiddleware);
 
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true });
 });
 
+app.use('/api/auth', authRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/documents', documentsRouter);

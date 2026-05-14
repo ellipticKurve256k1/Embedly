@@ -3,6 +3,7 @@ import { Search, Settings, LoaderCircle } from 'lucide-react';
 import logoSrc from '../references/embedly.png';
 import {
   initializeSettings,
+  loadSettings,
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
@@ -16,6 +17,7 @@ import UploadBox from './components/UploadBox';
 import ModelStatusBar from './components/ModelStatusBar';
 import SearchResults from './components/SearchResults';
 import ChatPanel from './components/ChatPanel';
+import LoginButton from './components/LoginButton';
 
 export default function App() {
   const [page, setPage] = useState(() => (
@@ -72,11 +74,19 @@ export default function App() {
       refreshConfiguredSettings();
     };
 
+    const handleAuthChange = () => {
+      loadSettings()
+        .then(refreshConfiguredSettings)
+        .catch(refreshConfiguredSettings);
+    };
+
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('embeddly:settings-changed', handleSettingsChange);
+    window.addEventListener('embeddly:auth-changed', handleAuthChange);
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('embeddly:settings-changed', handleSettingsChange);
+      window.removeEventListener('embeddly:auth-changed', handleAuthChange);
     };
   }, [refreshConfiguredSettings]);
 
@@ -159,6 +169,7 @@ export default function App() {
               llmSetup={llmSetup}
               vectorDbSetup={vectorDbSetup}
             />
+            <LoginButton />
             <a className="icon-button" href="#settings" aria-label="Open settings">
               <Settings size={20} />
             </a>

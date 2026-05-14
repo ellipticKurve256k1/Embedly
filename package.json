@@ -17,18 +17,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@getalby/bitcoin-connect-react": "^3.10.0",
+    "@noble/secp256k1": "^2.1.0",
+    "bech32": "^2.0.0",
     "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
     "csv-parse": "^6.2.1",
     "express": "^5.2.1",
+    "jose": "^5.9.0",
     "lucide-react": "^1.14.0",
     "multer": "^2.1.1",
     "pdf-parse": "^2.4.5",
+    "qrcode.react": "^4.2.0",
     "react": "latest",
     "react-dom": "latest",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
+    "@webbtc/webln-types": "^1.0.0",
     "@vitejs/plugin-react": "latest",
     "vite": "latest"
   }

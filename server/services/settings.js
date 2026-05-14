@@ -2,6 +2,12 @@ import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { db, nowIso, SERVER_DIR } from '../db.js';
+import {
+  deleteUserSettingRow,
+  getAllUserSettingRows,
+  getUserSettingRow,
+  setUserSettingRow,
+} from '../db/credentials.js';
 
 export const SETTINGS_KEYS = {
   llm: 'llm.setup',
@@ -22,7 +28,7 @@ const MASKED_API_KEY_PATTERN = /^.{1,7}\.\.\..{1,3}$/;
 
 let cachedEncryptionKey = null;
 
-function resolveEncryptionKey() {
+export function resolveEncryptionKey() {
   if (cachedEncryptionKey) {
     return cachedEncryptionKey;
   }
@@ -131,7 +137,7 @@ function toPublicSetting(publicKey, value) {
   };
 }
 
-function normalizeLlmSetup(value) {
+function normalizeLlmSetup(value, userId) {
   const input = value && typeof value === 'object' ? value : {};
   const provider = input.provider === 'api' ? 'api' : 'ollama';
   const setup = {
@@ -141,7 +147,7 @@ function normalizeLlmSetup(value) {
   };
 
   if (provider === 'api') {
-    const previousSetup = getLlmSetup();
+    const previousSetup = getLlmSetup(userId);
     const nextApiKey = String(input.apiKey ?? '').trim();
     const previousApiKey = String(previousSetup?.apiKey ?? '').trim();
 
@@ -155,23 +161,39 @@ function normalizeLlmSetup(value) {
   return setup;
 }
 
-function normalizeSetting(publicKey, value) {
+function normalizeSetting(publicKey, value, userId) {
   if (publicKey === 'llm') {
-    return normalizeLlmSetup(value);
+    return normalizeLlmSetup(value, userId);
   }
 
   return value;
 }
 
-export function getSetting(storageKey) {
-  const row = db.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get(storageKey);
+function getGlobalSettingRow(storageKey) {
+  return db.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get(storageKey);
+}
+
+function getGlobalSettingsRows() {
+  return db.prepare('SELECT key, value, encrypted FROM settings').all();
+}
+
+export function getSetting(storageKey, userId) {
+  const row = userId
+    ? getUserSettingRow(userId, storageKey) ?? getGlobalSettingRow(storageKey)
+    : getGlobalSettingRow(storageKey);
+
   return parseSettingValue(row);
 }
 
-export function setSetting(storageKey, value) {
+export function setSetting(storageKey, value, userId) {
   const encrypted = shouldEncryptSetting(value) ? 1 : 0;
   const serializedValue = JSON.stringify(value);
   const storedValue = encrypted ? encryptSetting(serializedValue) : serializedValue;
+
+  if (userId) {
+    setUserSettingRow(userId, storageKey, storedValue, encrypted);
+    return;
+  }
 
   db.prepare(`
     INSERT INTO settings (key, value, encrypted, updated_at)
@@ -183,12 +205,19 @@ export function setSetting(storageKey, value) {
   `).run(storageKey, storedValue, encrypted, nowIso());
 }
 
-export function deleteSetting(storageKey) {
+export function deleteSetting(storageKey, userId) {
+  if (userId) {
+    deleteUserSettingRow(userId, storageKey);
+    return;
+  }
+
   db.prepare('DELETE FROM settings WHERE key = ?').run(storageKey);
 }
 
-export function getAllSettings() {
-  const rows = db.prepare('SELECT key, value, encrypted FROM settings').all();
+export function getAllSettings(userId) {
+  const rows = userId
+    ? [...getGlobalSettingsRows(), ...getAllUserSettingRows(userId)]
+    : getGlobalSettingsRows();
   const settings = {};
 
   for (const row of rows) {
@@ -206,8 +235,8 @@ export function getAllSettings() {
   return settings;
 }
 
-export function getAllPublicSettings() {
-  const settings = getAllSettings();
+export function getAllPublicSettings(userId) {
+  const settings = getAllSettings(userId);
 
   return Object.fromEntries(
     Object.entries(settings).map(([publicKey, value]) => [
@@ -217,16 +246,16 @@ export function getAllPublicSettings() {
   );
 }
 
-export function getPublicSetting(publicKey) {
+export function getPublicSetting(publicKey, userId) {
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
   if (!storageKey) {
     return undefined;
   }
 
-  return toPublicSetting(publicKey, getSetting(storageKey));
+  return toPublicSetting(publicKey, getSetting(storageKey, userId));
 }
 
-export function savePublicSettings(settings) {
+export function savePublicSettings(settings, userId) {
   const input = settings && typeof settings === 'object' ? settings : {};
 
   for (const [publicKey, value] of Object.entries(input)) {
@@ -236,34 +265,34 @@ export function savePublicSettings(settings) {
     }
 
     if (value === null) {
-      deleteSetting(storageKey);
+      deleteSetting(storageKey, userId);
       continue;
     }
 
-    setSetting(storageKey, normalizeSetting(publicKey, value));
+    setSetting(storageKey, normalizeSetting(publicKey, value, userId), userId);
   }
 
-  return getAllPublicSettings();
+  return getAllPublicSettings(userId);
 }
 
-export function deletePublicSetting(publicKey) {
+export function deletePublicSetting(publicKey, userId) {
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
   if (!storageKey) {
     return false;
   }
 
-  deleteSetting(storageKey);
+  deleteSetting(storageKey, userId);
   return true;
 }
 
-export function getLlmSetup() {
-  return getSetting(SETTINGS_KEYS.llm);
+export function getLlmSetup(userId) {
+  return getSetting(SETTINGS_KEYS.llm, userId);
 }
 
-export function getEmbeddingSetup() {
-  return getSetting(SETTINGS_KEYS.embedding);
+export function getEmbeddingSetup(userId) {
+  return getSetting(SETTINGS_KEYS.embedding, userId);
 }
 
-export function getChunkingConfig() {
-  return getSetting(SETTINGS_KEYS.chunking);
+export function getChunkingConfig(userId) {
+  return getSetting(SETTINGS_KEYS.chunking, userId);
 }

@@ -83,7 +83,7 @@ function selectBetterChunks(originalChunks, rewrittenChunks) {
 
 router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
-  const savedLlmSetup = getLlmSetup() ?? {};
+  const savedLlmSetup = getLlmSetup(request.userId) ?? {};
   const rawLlmSetup = request.body?.llmSetup && typeof request.body.llmSetup === 'object'
     ? request.body.llmSetup
     : {};
@@ -96,7 +96,7 @@ router.post('/', async (request, response) => {
     ? requestedApiKey
     : savedApiKey;
   const llmConfig = { provider, model, endpoint, apiKey };
-  const savedEmbeddingSetup = getEmbeddingSetup() ?? {};
+  const savedEmbeddingSetup = getEmbeddingSetup(request.userId) ?? {};
   const embeddingModel = String(
     request.body?.embeddingModel
       || savedEmbeddingSetup.model

@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './auth.js';
+
 export const EMBEDDING_SETUP_STORAGE_KEY = 'embeddly.embeddingSetup';
 export const LLM_SETUP_STORAGE_KEY = 'embeddly.llmSetup';
 export const VECTOR_DB_SETUP_STORAGE_KEY = 'embeddly.vectorDbSetup';
@@ -145,7 +147,9 @@ export function normalizeChunkingConfig(config = {}) {
 }
 
 export async function loadSettings() {
-  const response = await fetch(`${API_BASE}/settings`);
+  const response = await fetch(`${API_BASE}/settings`, {
+    headers: getAuthHeaders(),
+  });
   return updateCachedSettings(await parseResponse(response));
 }
 
@@ -170,7 +174,7 @@ export async function initializeSettings() {
 export async function saveSettings(settings) {
   const response = await fetch(`${API_BASE}/settings`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(settings),
   });
 
