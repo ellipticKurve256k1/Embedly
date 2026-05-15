@@ -62,6 +62,28 @@ test('saveConversation stores conversations sorted by updatedAt descending', asy
   assert.equal((await getConversation('older')).title, 'Older');
 });
 
+test('saveConversation preserves provided updatedAt value', async () => {
+  await saveConversation({
+    id: 'stable',
+    title: 'Stable',
+    messages: [{ id: 'm1', role: 'user', content: 'hello', createdAt: '2026-01-01T00:00:00.000Z' }],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 2));
+  await saveConversation({
+    id: 'stable',
+    title: 'Stable after select',
+    messages: [{ id: 'm1', role: 'user', content: 'hello', createdAt: '2026-01-01T00:00:00.000Z' }],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  });
+
+  const conversation = await getConversation('stable');
+  assert.equal(conversation.title, 'Stable after select');
+  assert.equal(conversation.updatedAt, '2026-01-02T00:00:00.000Z');
+});
+
 test('deleteConversation removes a conversation', async () => {
   await saveConversation({
     id: 'delete-me',

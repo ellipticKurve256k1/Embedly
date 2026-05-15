@@ -140,7 +140,7 @@ export async function saveConversation(conversation) {
   const now = new Date().toISOString();
   const conv = normalizeConversation({
     ...conversation,
-    updatedAt: now,
+    updatedAt: conversation.updatedAt ?? now,
     createdAt: conversation.createdAt || now,
   });
 

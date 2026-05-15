@@ -132,6 +132,9 @@ export default function ChatPanel() {
       title: overrides.title ?? existingConversation?.title ?? generateTitle(firstUserMessage?.content),
       messages: storedMessages,
       createdAt: overrides.createdAt ?? existingConversation?.createdAt ?? new Date().toISOString(),
+      updatedAt: overrides.preserveUpdatedAt
+        ? existingConversation?.updatedAt
+        : overrides.updatedAt,
     });
 
     if (!savedConversation) return null;
@@ -148,7 +151,9 @@ export default function ChatPanel() {
   }, [refreshConversationList, setMessagesState]);
 
   const persistActiveConversation = useCallback(() => (
-    persistConversation(activeConversationIdRef.current, messagesRef.current)
+    persistConversation(activeConversationIdRef.current, messagesRef.current, {
+      preserveUpdatedAt: true,
+    })
   ), [persistConversation]);
 
   const updateAssistantMessage = useCallback((messageId, updater) => {
