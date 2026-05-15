@@ -288,29 +288,21 @@ export default function UploadBox() {
     ))
   ), [debouncedRightSearch, rightViews]);
 
-  const eligibleLeftIds = useMemo(() => (
-    leftViews.map((view) => view.document.id)
-  ), [leftViews]);
-
   const visibleEligibleLeftIds = useMemo(() => (
     visibleLeftViews.map((view) => view.document.id)
   ), [visibleLeftViews]);
 
   const selectedEligibleLeftIds = useMemo(() => (
-    eligibleLeftIds.filter((id) => leftSelection.has(id))
-  ), [eligibleLeftIds, leftSelection]);
+    visibleEligibleLeftIds.filter((id) => leftSelection.has(id))
+  ), [visibleEligibleLeftIds, leftSelection]);
 
   const visibleReturnableRightIds = useMemo(() => (
     visibleRightViews.filter(canReturnToAvailable).map((view) => view.document.id)
   ), [visibleRightViews]);
 
-  const returnableRightIds = useMemo(() => (
-    rightViews.filter(canReturnToAvailable).map((view) => view.document.id)
-  ), [rightViews]);
-
   const selectedReturnableRightIds = useMemo(() => (
-    returnableRightIds.filter((id) => rightSelection.has(id))
-  ), [returnableRightIds, rightSelection]);
+    visibleReturnableRightIds.filter((id) => rightSelection.has(id))
+  ), [visibleReturnableRightIds, rightSelection]);
 
   const allVisibleLeftSelected = visibleEligibleLeftIds.length > 0
     && visibleEligibleLeftIds.every((id) => leftSelection.has(id));
@@ -467,19 +459,6 @@ export default function UploadBox() {
     });
   }, [selectedEligibleLeftIds]);
 
-  const moveAllRight = useCallback(() => {
-    if (eligibleLeftIds.length === 0) {
-      return;
-    }
-
-    setKnowledgeBaseIds((currentIds) => new Set([...currentIds, ...eligibleLeftIds]));
-    setLeftSelection((currentIds) => {
-      const nextIds = new Set(currentIds);
-      eligibleLeftIds.forEach((id) => nextIds.delete(id));
-      return nextIds;
-    });
-  }, [eligibleLeftIds]);
-
   const moveSelectedLeft = useCallback(() => {
     if (selectedReturnableRightIds.length === 0) {
       return;
@@ -492,15 +471,6 @@ export default function UploadBox() {
     });
     setRightSelection(new Set());
   }, [selectedReturnableRightIds]);
-
-  const moveAllLeft = useCallback(() => {
-    setKnowledgeBaseIds((currentIds) => {
-      const nextIds = new Set(currentIds);
-      returnableRightIds.forEach((id) => nextIds.delete(id));
-      return nextIds;
-    });
-    setRightSelection(new Set());
-  }, [returnableRightIds]);
 
   const removeDocument = useCallback(async (document) => {
     const confirmed = window.confirm(`Remove ${document.filename}?`);
@@ -637,13 +607,9 @@ export default function UploadBox() {
 
           <TransferControls
             canMoveSelectedRight={selectedEligibleLeftIds.length > 0}
-            canMoveAllRight={eligibleLeftIds.length > 0}
             canMoveSelectedLeft={selectedReturnableRightIds.length > 0}
-            canMoveAllLeft={returnableRightIds.length > 0}
             onMoveSelectedRight={moveSelectedRight}
-            onMoveAllRight={moveAllRight}
             onMoveSelectedLeft={moveSelectedLeft}
-            onMoveAllLeft={moveAllLeft}
           />
 
           <TransferPane

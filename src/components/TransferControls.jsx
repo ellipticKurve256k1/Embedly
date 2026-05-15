@@ -1,4 +1,4 @@
-import { ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 function TransferButton({ label, children, disabled, onClick }) {
   return (
@@ -17,13 +17,9 @@ function TransferButton({ label, children, disabled, onClick }) {
 
 export default function TransferControls({
   canMoveSelectedRight,
-  canMoveAllRight,
   canMoveSelectedLeft,
-  canMoveAllLeft,
   onMoveSelectedRight,
-  onMoveAllRight,
   onMoveSelectedLeft,
-  onMoveAllLeft,
 }) {
   return (
     <div className="transfer-controls" aria-label="Move files between panes">
@@ -36,27 +32,11 @@ export default function TransferControls({
       </TransferButton>
 
       <TransferButton
-        label="Move all available files to Knowledge Base"
-        disabled={!canMoveAllRight}
-        onClick={onMoveAllRight}
-      >
-        <ChevronsRight size={18} />
-      </TransferButton>
-
-      <TransferButton
         label="Move selected files back to available files"
         disabled={!canMoveSelectedLeft}
         onClick={onMoveSelectedLeft}
       >
         <ChevronLeft size={18} />
-      </TransferButton>
-
-      <TransferButton
-        label="Return all queued or failed files to available files"
-        disabled={!canMoveAllLeft}
-        onClick={onMoveAllLeft}
-      >
-        <ChevronsLeft size={18} />
       </TransferButton>
     </div>
   );
