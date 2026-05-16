@@ -1,6 +1,6 @@
 # Embeddly Design System
 
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## 1. Layout Architecture
 
@@ -26,7 +26,7 @@ The topbar carries the logo, mode switching, configured model status, wallet log
 
 Chat and search modes show a setup-required glass notice instead of their primary controls when required providers are missing. The notice lists missing settings and links directly to Settings, while upload stays available.
 
-Retrieval settings include optional reranking controls. When enabled, users can choose the local cross-encoder model, candidate count, and final result count from the same Retrieval settings surface.
+Retrieval settings include optional reranking controls. When enabled, users can choose the local cross-encoder model, candidate count, and final result count from the same Retrieval settings surface. Project selectors in chat and search scope retrieval to a named dataset while preserving All Documents as the default.
 
 ## 2. Color Palette
 
@@ -102,6 +102,7 @@ Component interiors generally use 10-18px gaps and padding. Dense operational vi
 | `.search-box` | Pill input | 999px | Large glass search control |
 | `.model-card` | Selectable card | 14px | Radio row, selected accent border |
 | `.configured-model-card` | Summary card | 14px | Provider icon, model text, change action |
+| `.project-selector` | Compact selector | 12px | Folder icon, label, and native select for dataset scope |
 | `.setup-message` | Inline banner | 14px | Info, warning, error, or success state |
 | `.save-button` | Primary action | 10px | Accent gradient, icon plus label |
 
@@ -159,6 +160,7 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 | Component | Description |
 |-----------|-------------|
 | `ChatPanel` | Main chat container with conversation sidebar, message area, sources panel, and footer input. |
+| `ProjectSelector` | Dataset selector above the chat transcript. |
 | `ChatSidebar` | Collapsible conversation history rail with new-chat, rename, delete, and count controls. |
 | `ChatSessionItem` | Conversation row or icon-only collapsed item with active and rename states. |
 | `ChatInput` | Text input and send action for user prompts. |
@@ -172,6 +174,7 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 Visual rules:
 
 - Chat uses a glass panel aligned to the application shell.
+- The project selector sits in a compact toolbar above messages and does not compete with the chat input.
 - The conversation sidebar is 260px when expanded and a 44px icon rail when collapsed.
 - Collapsed sidebar items expose titles through hover tooltips and keep the active conversation visibly highlighted.
 - Mobile treats the expanded sidebar as a left overlay drawer while preserving a narrow access rail.
@@ -190,6 +193,7 @@ Visual rules:
 |-----------|-------------|
 | `UploadBox` | Owns file loading, transfer state, selections, and job polling. |
 | `FileDropZone` | Compact drag-and-drop area for accepted files. |
+| `ProjectSelector` | New-upload project selector and batch assignment selector. |
 | `TransferPane` | Left or right file list with search and selection. |
 | `FileTransferRow` | Individual file row with icon, metadata, selection, and status. |
 | `TransferControls` | Move selected files between panes. |
@@ -200,6 +204,8 @@ Visual rules:
 - Left pane represents available uploaded files.
 - Right pane represents the knowledge base queue or indexed set.
 - Status badges communicate pending, embedding, completed, and failed states.
+- Project badges on rows should stay compact and secondary to filename and processing status.
+- Per-row project dropdowns and batch assignment controls use native selects to keep repeated file triage fast.
 - Active stages such as parsing, chunking, embedding, and indexing use progress treatment.
 - Failed rows must keep the retry or return path clear.
 - Upload errors should appear near the upload workflow rather than in global chrome.
@@ -212,6 +218,7 @@ Visual rules:
 | Provider cards | Radio-selectable provider choices with icon and mode badge. |
 | Model cards | Radio-selectable model rows populated from Ollama when applicable. |
 | Form fields | Text, URL, password, number, select, range, and checkbox inputs. |
+| Project cards | Editable project name, optional description, document count, save, and delete actions. |
 | Warning banners | Privacy and validation warnings for external API usage. |
 | Save button | Primary action with loading and saved/error feedback. |
 
@@ -222,6 +229,7 @@ Visual rules:
 - Provider mode badges distinguish local and remote options.
 - External API setup uses a warning banner because prompts and context leave the local machine.
 - API keys are described as stored encrypted on the local server and masked after saving.
+- Projects are managed in Settings; deleting one clearly communicates that documents become unassigned.
 - Success and error save messages use the same `.setup-message` system as validation feedback.
 
 ## 14. Login Modal
@@ -241,17 +249,19 @@ Visual rules:
 - The copy action stays available even when browser-wallet connection fails.
 - The LNURL auth request is visible in a selectable read-only field for manual wallet paste flows.
 
-## 14. Search Results & Ontology Map
+## 15. Search Results & Ontology Map
 
 | Component | Description |
 |-----------|-------------|
 | `SearchResults` | Coordinates result list, selected state, detail panel, and map. |
+| `ProjectSelector` | Result-header selector for changing the active dataset and rerunning search. |
 | `ResultPanel` | Detail preview for a selected search result. |
 | `OntologyMap` | Interactive node-link visualization for search result relationships. |
 
 Visual rules:
 
 - Result cards show document name, chunk preview, and relevance score.
+- Result headers show the active dataset, with All Documents as the default scope.
 - Reranked chat sources show both embedding and rerank scores so users can tell when the second stage affected ordering.
 - Selected result state should be obvious without overpowering the map.
 - The ontology map represents chunks or documents as circular nodes connected by relationship lines.

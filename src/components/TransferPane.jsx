@@ -19,6 +19,8 @@ export default function TransferPane({
   onEmbedFile,
   isActionDisabled = false,
   onClearAll,
+  projects = [],
+  onProjectChange,
   searchPlaceholder = 'Search files...',
   emptyTitle,
   emptyBody,
@@ -87,6 +89,8 @@ export default function TransferPane({
               onRemove={onRemoveFile}
               onEmbed={onEmbedFile}
               isActionDisabled={isActionDisabled}
+              projects={projects}
+              onProjectChange={onProjectChange}
             />
           ))
         )}

@@ -2,13 +2,33 @@ import express from 'express';
 import { unlink } from 'node:fs/promises';
 import {
   db,
+  getDocumentsByProject,
+  getProjectById,
   getUploadPath,
   toPublicDocument,
+  updateDocumentProject,
 } from '../db.js';
 
 const router = express.Router();
 
-router.get('/', (_request, response) => {
+function normalizeProjectId(value) {
+  const projectId = String(value ?? '').trim();
+  return projectId || null;
+}
+
+router.get('/', (request, response) => {
+  const projectId = normalizeProjectId(request.query.projectId);
+
+  if (projectId) {
+    if (!getProjectById(projectId)) {
+      response.status(404).json({ error: 'Project not found.' });
+      return;
+    }
+
+    response.json({ documents: getDocumentsByProject(projectId) });
+    return;
+  }
+
   const rows = db.prepare(`
     SELECT *
     FROM documents
@@ -37,6 +57,25 @@ router.get('/:id', (request, response) => {
     document: toPublicDocument(document),
     chunks,
   });
+});
+
+router.patch('/:id', (request, response) => {
+  const projectId = normalizeProjectId(request.body?.projectId);
+
+  if (projectId && !getProjectById(projectId)) {
+    response.status(404).json({ error: 'Project not found.' });
+    return;
+  }
+
+  const updated = updateDocumentProject(request.params.id, projectId);
+
+  if (!updated) {
+    response.status(404).json({ error: 'Document not found.' });
+    return;
+  }
+
+  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(request.params.id);
+  response.json({ document: toPublicDocument(document) });
 });
 
 router.delete('/:id', async (request, response) => {

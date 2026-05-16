@@ -18,6 +18,7 @@ export default function SourcesPanel({
   retrievalQuery,
   originalQuery,
   wasRewritten,
+  projectName,
   status,
   onClose,
 }) {
@@ -58,6 +59,9 @@ export default function SourcesPanel({
               {wasRewritten && originalQuery && (
                 <small className="sources-panel__original">Original: "{originalQuery}"</small>
               )}
+              {projectName && (
+                <small className="sources-panel__original">Dataset: {projectName}</small>
+              )}
             </div>
           )}
 
@@ -93,6 +97,7 @@ export default function SourcesPanel({
                       : 'No preview available.'}
                   </p>
                   <small>Chunk {chunk.chunkIndex != null ? chunk.chunkIndex + 1 : 'unknown'}</small>
+                  {chunk.projectName && <small>{chunk.projectName}</small>}
                 </article>
               ))
             )}

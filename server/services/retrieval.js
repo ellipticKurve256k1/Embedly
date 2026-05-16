@@ -29,6 +29,8 @@ export function toPublicChunk(row, score) {
     documentName: row.document_name,
     documentType: row.document_type,
     documentSize: row.document_size,
+    projectId: row.project_id ?? null,
+    projectName: row.project_name ?? null,
     uploadedAt: row.uploaded_at,
     totalChunks: row.total_chunks,
     tokenCount: row.token_count,
@@ -47,6 +49,8 @@ export function toContextChunk(chunk) {
     documentName: chunk.documentName,
     documentType: chunk.documentType,
     documentSize: chunk.documentSize,
+    projectId: chunk.projectId,
+    projectName: chunk.projectName,
     uploadedAt: chunk.uploadedAt,
     totalChunks: chunk.totalChunks,
     tokenCount: chunk.tokenCount,
@@ -101,8 +105,10 @@ export async function retrieveChunks(query, {
   candidateLimit,
   topK,
   reranker = null,
+  projectId = null,
 } = {}) {
   const trimmedQuery = String(query ?? '').trim();
+  const normalizedProjectId = String(projectId ?? '').trim() || null;
 
   if (!trimmedQuery) {
     throw new Error('Search query is required.');
@@ -117,6 +123,7 @@ export async function retrieveChunks(query, {
     )
     : finalLimit;
   const queryVector = Float32Array.from(await embedText(trimmedQuery, model));
+  const queryParams = normalizedProjectId ? [model, normalizedProjectId] : [model];
   const rows = db.prepare(`
     SELECT
       embeddings.vector,
@@ -129,13 +136,17 @@ export async function retrieveChunks(query, {
       documents.filename AS document_name,
       documents.mime_type AS document_type,
       documents.size_bytes AS document_size,
+      documents.project_id,
+      projects.name AS project_name,
       documents.created_at AS uploaded_at,
       documents.chunk_count AS total_chunks
     FROM embeddings
     JOIN chunks ON chunks.id = embeddings.chunk_id
     JOIN documents ON documents.id = chunks.document_id
+    LEFT JOIN projects ON projects.id = documents.project_id
     WHERE embeddings.model = ?
-  `).all(model);
+      ${normalizedProjectId ? 'AND documents.project_id = ?' : ''}
+  `).all(...queryParams);
 
   const candidates = rows
     .map((row) => toPublicChunk(row, cosineSimilarity(queryVector, blobToVector(row.vector))))

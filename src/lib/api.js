@@ -19,7 +19,16 @@ async function parseResponse(response) {
 
 export async function uploadFiles(files) {
   const formData = new FormData();
-  files.forEach((file) => formData.append('files', file));
+  const hasOptionsShape = files && typeof files === 'object' && Object.prototype.hasOwnProperty.call(files, 'files');
+  const fileSource = hasOptionsShape ? files.files : files;
+  const fileList = Array.from(fileSource ?? []);
+  const projectId = hasOptionsShape ? files.projectId : null;
+
+  fileList.forEach((file) => formData.append('files', file));
+
+  if (projectId) {
+    formData.append('projectId', projectId);
+  }
 
   const response = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
@@ -37,9 +46,77 @@ export async function getDocuments() {
   return parseResponse(response);
 }
 
+export async function getDocumentsByProject(projectId) {
+  const searchParams = new URLSearchParams();
+
+  if (projectId) {
+    searchParams.set('projectId', projectId);
+  }
+
+  const queryString = searchParams.toString();
+  const response = await fetch(`${API_BASE}/documents${queryString ? `?${queryString}` : ''}`, {
+    headers: getAuthHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function updateDocumentProject(documentId, projectId) {
+  const response = await fetch(`${API_BASE}/documents/${documentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ projectId: projectId || null }),
+  });
+
+  return parseResponse(response);
+}
+
 export async function deleteDocument(id) {
   const response = await fetch(`${API_BASE}/documents/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  return parseResponse(response);
+}
+
+export async function getProjects() {
+  const response = await fetch(`${API_BASE}/projects`, {
+    headers: getAuthHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function createProject({ name, description = '' }) {
+  const response = await fetch(`${API_BASE}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ name, description }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function updateProject(id, { name, description = '' }) {
+  const response = await fetch(`${API_BASE}/projects/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ name, description }),
+  });
+
+  return parseResponse(response);
+}
+
+export async function deleteProject(id) {
+  const response = await fetch(`${API_BASE}/projects/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  return parseResponse(response);
+}
+
+export async function getProjectDocuments(id) {
+  const response = await fetch(`${API_BASE}/projects/${id}/documents`, {
     headers: getAuthHeaders(),
   });
 
@@ -68,12 +145,16 @@ export async function getJobs() {
   return parseResponse(response);
 }
 
-export async function searchQuery(query) {
+export async function searchQuery(query, projectId = null) {
   const embeddingSetup = readSavedEmbeddingSetup();
   const searchParams = new URLSearchParams({ q: query });
 
   if (embeddingSetup?.model) {
     searchParams.set('model', embeddingSetup.model);
+  }
+
+  if (projectId) {
+    searchParams.set('projectId', projectId);
   }
 
   const response = await fetch(`${API_BASE}/search?${searchParams.toString()}`, {
@@ -105,6 +186,7 @@ export async function streamChatResponse({
   message,
   conversationId,
   history,
+  projectId,
   onContext,
   onCitations,
   onToken,
@@ -124,6 +206,7 @@ export async function streamChatResponse({
       history: Array.isArray(history) ? history : [],
       llmSetup: llmSetup ?? null,
       embeddingModel: embeddingSetup?.model,
+      projectId: projectId || null,
     }),
   });
 

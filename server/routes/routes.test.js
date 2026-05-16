@@ -3,6 +3,7 @@ import test, { afterEach } from 'node:test';
 import express from 'express';
 import { db, nowIso } from '../db.js';
 import documentsRouter from './documents.js';
+import projectsRouter from './projects.js';
 import searchRouter from './search.js';
 import settingsRouter from './settings.js';
 import { deleteSetting, SETTINGS_KEYS } from '../services/settings.js';
@@ -15,6 +16,7 @@ function createApp() {
     response.json({ status: 'ok' });
   });
   app.use('/api/documents', documentsRouter);
+  app.use('/api/projects', projectsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/settings', settingsRouter);
   return app;
@@ -30,8 +32,17 @@ function insertRouteTestDocument(id = 'route-doc') {
   `).run(id, `${id}.txt`, `${id}.txt`, 'text/plain', 10, 'pending', null, 0, nowIso(), nowIso());
 }
 
+function insertRouteTestProject(id = 'route-project') {
+  db.prepare(`
+    INSERT INTO projects (id, name, description, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(id, `${id} name`, null, nowIso());
+}
+
 afterEach(() => {
   db.prepare("DELETE FROM documents WHERE id LIKE 'route-%'").run();
+  db.prepare("DELETE FROM projects WHERE id LIKE 'route-%'").run();
+  db.prepare("DELETE FROM projects WHERE name LIKE 'route-%'").run();
   for (const key of Object.values(SETTINGS_KEYS)) {
     deleteSetting(key);
   }
@@ -49,6 +60,31 @@ test('GET /api/documents returns documents array', async () => {
   assert.ok(Array.isArray(response.body.documents));
 });
 
+test('POST /api/projects creates a project', async () => {
+  const response = await dispatchExpress(createApp(), {
+    method: 'POST',
+    path: '/api/projects',
+    body: { name: 'route-project-created', description: 'docs' },
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.project.name, 'route-project-created');
+  assert.equal(response.body.project.documentCount, 0);
+});
+
+test('GET /api/projects returns project document counts', async () => {
+  insertRouteTestProject('route-project-list');
+  insertRouteTestDocument('route-doc-project-list');
+  db.prepare('UPDATE documents SET project_id = ? WHERE id = ?')
+    .run('route-project-list', 'route-doc-project-list');
+
+  const response = await dispatchExpress(createApp(), { path: '/api/projects' });
+
+  assert.equal(response.status, 200);
+  const project = response.body.projects.find((item) => item.id === 'route-project-list');
+  assert.equal(project.documentCount, 1);
+});
+
 test('GET /api/documents/:id returns a document with chunks', async () => {
   insertRouteTestDocument('route-doc-get');
   const response = await dispatchExpress(createApp(), { path: '/api/documents/route-doc-get' });
@@ -61,6 +97,55 @@ test('GET /api/documents/:id returns 404 for missing document', async () => {
   const response = await dispatchExpress(createApp(), { path: '/api/documents/missing' });
   assert.equal(response.status, 404);
   assert.match(response.body.error, /not found/i);
+});
+
+test('PATCH /api/documents/:id assigns a project', async () => {
+  insertRouteTestProject('route-project-assign');
+  insertRouteTestDocument('route-doc-assign');
+
+  const response = await dispatchExpress(createApp(), {
+    method: 'PATCH',
+    path: '/api/documents/route-doc-assign',
+    body: { projectId: 'route-project-assign' },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.document.projectId, 'route-project-assign');
+});
+
+test('GET /api/documents filters by projectId', async () => {
+  insertRouteTestProject('route-project-filter');
+  insertRouteTestDocument('route-doc-filter-match');
+  insertRouteTestDocument('route-doc-filter-other');
+  db.prepare('UPDATE documents SET project_id = ? WHERE id = ?')
+    .run('route-project-filter', 'route-doc-filter-match');
+
+  const response = await dispatchExpress(createApp(), {
+    path: '/api/documents?projectId=route-project-filter',
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    response.body.documents.map((document) => document.id),
+    ['route-doc-filter-match'],
+  );
+});
+
+test('DELETE /api/projects/:id unassigns documents', async () => {
+  insertRouteTestProject('route-project-delete');
+  insertRouteTestDocument('route-doc-project-delete');
+  db.prepare('UPDATE documents SET project_id = ? WHERE id = ?')
+    .run('route-project-delete', 'route-doc-project-delete');
+
+  const response = await dispatchExpress(createApp(), {
+    method: 'DELETE',
+    path: '/api/projects/route-project-delete',
+  });
+  const document = db.prepare('SELECT project_id FROM documents WHERE id = ?')
+    .get('route-doc-project-delete');
+
+  assert.equal(response.status, 200);
+  assert.equal(document.project_id, null);
 });
 
 test('DELETE /api/documents/:id deletes an existing document', async () => {

@@ -86,8 +86,10 @@ export default function FileTransferRow({
   onRemove,
   onEmbed,
   isActionDisabled,
+  projects = [],
+  onProjectChange,
 }) {
-  const { document, displayStatus, progress, statusGroup } = view;
+  const { document, displayStatus, progress, project, statusGroup } = view;
   const isActive = ACTIVE_STATUSES.has(displayStatus);
   const isKnowledge = variant === 'knowledge';
   const isSelectable = !isKnowledge || statusGroup === 'pending' || statusGroup === 'failed';
@@ -114,6 +116,9 @@ export default function FileTransferRow({
         <div className="transfer-row-title">
           <strong>{document.filename}</strong>
           <span>{formatSize(document.sizeBytes)}</span>
+          <span className={`transfer-project-badge${project ? '' : ' is-empty'}`}>
+            {project?.name ?? 'No project'}
+          </span>
         </div>
       </div>
 
@@ -131,6 +136,20 @@ export default function FileTransferRow({
       </div>
 
       <div className="transfer-row-actions">
+        <select
+          className="transfer-project-select"
+          value={document.projectId ?? ''}
+          aria-label={`Project for ${document.filename}`}
+          onChange={(event) => onProjectChange?.(document, event.target.value || null)}
+        >
+          <option value="">No project</option>
+          {projects.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+
         {(showRetry || showReembed) && (
           <button
             className="transfer-row-action"

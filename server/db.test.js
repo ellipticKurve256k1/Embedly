@@ -26,7 +26,7 @@ function insertDocument(database, id = 'doc-1') {
 }
 
 test('SCHEMA_SQL includes all core tables', () => {
-  for (const tableName of ['documents', 'chunks', 'embeddings', 'embedding_jobs', 'settings']) {
+  for (const tableName of ['projects', 'documents', 'chunks', 'embeddings', 'embedding_jobs', 'settings']) {
     assert.match(SCHEMA_SQL, new RegExp(`CREATE TABLE IF NOT EXISTS ${tableName}`));
   }
 });
@@ -42,6 +42,13 @@ test('initializeSchema creates settings table', () => {
   const database = createMemoryDb();
   const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get();
   assert.equal(row.name, 'settings');
+  database.close();
+});
+
+test('initializeSchema creates projects table', () => {
+  const database = createMemoryDb();
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'projects'").get();
+  assert.equal(row.name, 'projects');
   database.close();
 });
 
@@ -74,6 +81,7 @@ test('toPublicDocument maps database row to public shape', () => {
     status: 'ready',
     error: null,
     chunkCount: 2,
+    projectId: null,
     createdAt: 'c',
     updatedAt: 'u',
   });
@@ -124,6 +132,18 @@ test('settings can be inserted and updated', () => {
   database.prepare('UPDATE settings SET value = ? WHERE key = ?').run('{"strategy":"recursive"}', 'chunking.config');
   const row = database.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get('chunking.config');
   assert.deepEqual(row, { value: '{"strategy":"recursive"}', encrypted: 0 });
+  database.close();
+});
+
+test('deleting a project unassigns documents', () => {
+  const database = createMemoryDb();
+  database.prepare('INSERT INTO projects (id, name, description, created_at) VALUES (?, ?, ?, ?)')
+    .run('project-1', 'Project One', null, nowIso());
+  insertDocument(database);
+  database.prepare('UPDATE documents SET project_id = ? WHERE id = ?').run('project-1', 'doc-1');
+  database.prepare('DELETE FROM projects WHERE id = ?').run('project-1');
+  const row = database.prepare('SELECT project_id FROM documents WHERE id = ?').get('doc-1');
+  assert.equal(row.project_id, null);
   database.close();
 });
 

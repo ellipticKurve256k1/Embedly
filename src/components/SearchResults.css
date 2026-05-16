@@ -53,6 +53,8 @@
 
 .result-list-header {
   flex-shrink: 0;
+  display: grid;
+  gap: 8px;
   padding: 22px 28px 14px;
 }
 
@@ -65,10 +67,24 @@
 
 .result-list-query {
   display: block;
-  margin-top: 4px;
   font-size: 15px;
   font-weight: 600;
   color: #8f9ab5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-project-selector {
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.result-list-project {
+  color: #6258ff;
+  font-size: 12px;
+  font-weight: 850;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

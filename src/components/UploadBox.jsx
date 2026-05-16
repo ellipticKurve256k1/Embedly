@@ -4,10 +4,12 @@ import {
   getDocuments,
   getJobs,
   startEmbedding,
+  updateDocumentProject,
   uploadFiles,
 } from '../lib/api.js';
 import EmbedActionBar from './EmbedActionBar.jsx';
 import FileDropZone from './FileDropZone.jsx';
+import ProjectSelector from './ProjectSelector.jsx';
 import TransferControls from './TransferControls.jsx';
 import TransferPane from './TransferPane.jsx';
 import './UploadBox.css';
@@ -108,7 +110,7 @@ function isSettledJob(job) {
   return TERMINAL_JOB_STATUSES.has(job?.status) || TERMINAL_JOB_STATUSES.has(job?.stage);
 }
 
-export default function UploadBox() {
+export default function UploadBox({ projects = [] }) {
   const [documents, setDocuments] = useState([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -123,6 +125,8 @@ export default function UploadBox() {
   const [embeddingDocumentIds, setEmbeddingDocumentIds] = useState(() => new Set());
   const [jobProgress, setJobProgress] = useState({});
   const [uploadingFiles, setUploadingFiles] = useState([]);
+  const [uploadProjectId, setUploadProjectId] = useState(null);
+  const [batchProjectId, setBatchProjectId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
 
@@ -226,6 +230,10 @@ export default function UploadBox() {
     };
   }, [documents, embeddingDocumentIds, refreshDocuments]);
 
+  const projectById = useMemo(() => (
+    new Map(projects.map((project) => [project.id, project]))
+  ), [projects]);
+
   const documentViews = useMemo(() => (
     documents.map((document) => {
       const displayStatus = getDisplayStatus(document, embeddingDocumentIds, jobProgress);
@@ -235,9 +243,10 @@ export default function UploadBox() {
         displayStatus,
         statusGroup: getStatusGroup(displayStatus),
         progress: jobProgress[document.id],
+        project: document.projectId ? projectById.get(document.projectId) ?? null : null,
       };
     })
-  ), [documents, embeddingDocumentIds, jobProgress]);
+  ), [documents, embeddingDocumentIds, jobProgress, projectById]);
 
   useEffect(() => {
     const existingIds = new Set(documentViews.map((view) => view.document.id));
@@ -304,6 +313,12 @@ export default function UploadBox() {
     visibleReturnableRightIds.filter((id) => rightSelection.has(id))
   ), [visibleReturnableRightIds, rightSelection]);
 
+  const selectedProjectAssignableIds = useMemo(() => (
+    [...new Set([...leftSelection, ...rightSelection])].filter((id) => (
+      documentViews.some((view) => view.document.id === id)
+    ))
+  ), [documentViews, leftSelection, rightSelection]);
+
   const allVisibleLeftSelected = visibleEligibleLeftIds.length > 0
     && visibleEligibleLeftIds.every((id) => leftSelection.has(id));
   const allVisibleRightSelected = visibleReturnableRightIds.length > 0
@@ -343,7 +358,7 @@ export default function UploadBox() {
     setUploadingFiles(formatFileList(accepted));
 
     try {
-      const payload = await uploadFiles(accepted);
+      const payload = await uploadFiles({ files: accepted, projectId: uploadProjectId });
       setDocuments((currentDocuments) => [
         ...(payload.documents ?? []),
         ...currentDocuments,
@@ -354,7 +369,7 @@ export default function UploadBox() {
       setIsUploading(false);
       setUploadingFiles([]);
     }
-  }, [documents, uploadingFiles]);
+  }, [documents, uploadProjectId, uploadingFiles]);
 
   const onDragOver = useCallback((event) => {
     event.preventDefault();
@@ -505,6 +520,53 @@ export default function UploadBox() {
     }
   }, []);
 
+  const assignDocumentProject = useCallback(async (document, projectId) => {
+    setErrorMessage('');
+
+    try {
+      const payload = await updateDocumentProject(document.id, projectId);
+      const updatedDocument = payload.document;
+
+      if (updatedDocument) {
+        setDocuments((currentDocuments) => (
+          currentDocuments.map((currentDocument) => (
+            currentDocument.id === updatedDocument.id ? updatedDocument : currentDocument
+          ))
+        ));
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update project.');
+    }
+  }, []);
+
+  const assignSelectedProject = useCallback(async () => {
+    if (selectedProjectAssignableIds.length === 0) {
+      return;
+    }
+
+    setErrorMessage('');
+
+    try {
+      const updates = await Promise.all(
+        selectedProjectAssignableIds.map((documentId) => (
+          updateDocumentProject(documentId, batchProjectId)
+        )),
+      );
+      const updatedById = new Map(
+        updates
+          .map((payload) => payload.document)
+          .filter(Boolean)
+          .map((document) => [document.id, document]),
+      );
+
+      setDocuments((currentDocuments) => (
+        currentDocuments.map((document) => updatedById.get(document.id) ?? document)
+      ));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update selected projects.');
+    }
+  }, [batchProjectId, selectedProjectAssignableIds]);
+
   const embedDocuments = useCallback(async (documentsToEmbed) => {
     const documentIds = documentsToEmbed.map((document) => document.id);
 
@@ -576,6 +638,16 @@ export default function UploadBox() {
           onFilesSelected={handleFiles}
         />
 
+        <div className="upload-project-toolbar">
+          <ProjectSelector
+            projects={projects}
+            value={uploadProjectId}
+            label="New uploads"
+            emptyLabel="No project"
+            onChange={setUploadProjectId}
+          />
+        </div>
+
         {errorMessage && (
           <div className="upload-message is-error" role="alert">
             {errorMessage}
@@ -599,6 +671,8 @@ export default function UploadBox() {
             onSelectAll={toggleVisibleLeftSelection}
             onSelectFile={selectLeftFile}
             onRemoveFile={removeDocument}
+            projects={projects}
+            onProjectChange={assignDocumentProject}
             emptyTitle={documents.length === 0 ? 'Upload files to build your pool' : 'No files match this search'}
             emptyBody={documents.length === 0
               ? 'Files stay here until you move them into the knowledge base.'
@@ -628,12 +702,30 @@ export default function UploadBox() {
             onRemoveFile={removeDocument}
             onEmbedFile={embedSingleDocument}
             isActionDisabled={isEmbeddingAny}
+            projects={projects}
+            onProjectChange={assignDocumentProject}
             emptyTitle={rightViews.length === 0 ? 'Knowledge base is empty' : 'No knowledge base files match this search'}
             emptyBody={rightViews.length === 0
               ? 'Move available files here to queue them for embedding.'
               : 'Clear or change the search filter to see more files.'}
           />
         </section>
+
+        {selectedProjectAssignableIds.length > 0 && (
+          <div className="project-assignment-bar">
+            <span>{selectedProjectAssignableIds.length} selected</span>
+            <ProjectSelector
+              projects={projects}
+              value={batchProjectId}
+              label="Set project"
+              emptyLabel="No project"
+              onChange={setBatchProjectId}
+            />
+            <button type="button" onClick={assignSelectedProject}>
+              Apply
+            </button>
+          </div>
+        )}
 
         <EmbedActionBar
           views={rightViews}

@@ -16,6 +16,13 @@ export const db = new Database(DB_PATH);
 db.pragma('foreign_keys = ON');
 
 export const SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    description TEXT,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
     filename TEXT NOT NULL,
@@ -25,6 +32,7 @@ export const SCHEMA_SQL = `
     status TEXT NOT NULL DEFAULT 'pending',
     error TEXT,
     chunk_count INTEGER NOT NULL DEFAULT 0,
+    project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -77,6 +85,15 @@ export const SCHEMA_SQL = `
 export function initializeSchema(database) {
   database.pragma('foreign_keys = ON');
   database.exec(SCHEMA_SQL);
+
+  const documentColumns = database.prepare('PRAGMA table_info(documents)').all();
+  const hasProjectColumn = documentColumns.some((column) => column.name === 'project_id');
+
+  if (!hasProjectColumn) {
+    database.exec('ALTER TABLE documents ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL');
+  }
+
+  database.exec('CREATE INDEX IF NOT EXISTS idx_documents_project_id ON documents(project_id)');
 }
 
 initializeSchema(db);
@@ -90,16 +107,21 @@ export function getUploadPath(storedFilename) {
 }
 
 export function insertDocument(document) {
+  const row = {
+    projectId: null,
+    ...document,
+  };
+
   db.prepare(`
     INSERT INTO documents (
       id, filename, stored_filename, mime_type, size_bytes, status, error,
-      chunk_count, created_at, updated_at
+      chunk_count, project_id, created_at, updated_at
     )
     VALUES (
       @id, @filename, @storedFilename, @mimeType, @sizeBytes, @status, @error,
-      @chunkCount, @createdAt, @updatedAt
+      @chunkCount, @projectId, @createdAt, @updatedAt
     )
-  `).run(document);
+  `).run(row);
 }
 
 export function updateDocumentStatus(id, status, error = null) {
@@ -134,6 +156,111 @@ export function clearDocumentIndex(documentId) {
   })();
 }
 
+export function toPublicProject(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? '',
+    documentCount: Number(row.document_count ?? row.documentCount ?? 0),
+    createdAt: row.created_at,
+  };
+}
+
+export function listProjects() {
+  return db.prepare(`
+    SELECT
+      projects.id,
+      projects.name,
+      projects.description,
+      projects.created_at,
+      COUNT(documents.id) AS document_count
+    FROM projects
+    LEFT JOIN documents ON documents.project_id = projects.id
+    GROUP BY projects.id
+    ORDER BY LOWER(projects.name) ASC
+  `).all().map(toPublicProject);
+}
+
+export function getProjectById(id) {
+  return toPublicProject(db.prepare(`
+    SELECT
+      projects.id,
+      projects.name,
+      projects.description,
+      projects.created_at,
+      COUNT(documents.id) AS document_count
+    FROM projects
+    LEFT JOIN documents ON documents.project_id = projects.id
+    WHERE projects.id = ?
+    GROUP BY projects.id
+  `).get(id));
+}
+
+export function insertProject(project) {
+  const row = {
+    description: null,
+    ...project,
+  };
+
+  db.prepare(`
+    INSERT INTO projects (id, name, description, created_at)
+    VALUES (@id, @name, @description, @createdAt)
+  `).run(row);
+
+  return getProjectById(row.id);
+}
+
+export function updateProject(id, updates) {
+  const existingProject = getProjectById(id);
+
+  if (!existingProject) {
+    return null;
+  }
+
+  const name = Object.prototype.hasOwnProperty.call(updates, 'name')
+    ? updates.name
+    : existingProject.name;
+  const description = Object.prototype.hasOwnProperty.call(updates, 'description')
+    ? updates.description
+    : existingProject.description;
+
+  db.prepare(`
+    UPDATE projects
+    SET name = ?, description = ?
+    WHERE id = ?
+  `).run(name, description, id);
+
+  return getProjectById(id);
+}
+
+export function deleteProject(id) {
+  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+  return result.changes > 0;
+}
+
+export function updateDocumentProject(documentId, projectId) {
+  const result = db.prepare(`
+    UPDATE documents
+    SET project_id = ?, updated_at = ?
+    WHERE id = ?
+  `).run(projectId, nowIso(), documentId);
+
+  return result.changes > 0;
+}
+
+export function getDocumentsByProject(projectId) {
+  return db.prepare(`
+    SELECT *
+    FROM documents
+    WHERE project_id = ?
+    ORDER BY created_at DESC
+  `).all(projectId).map(toPublicDocument);
+}
+
 export function toPublicDocument(row) {
   if (!row) {
     return null;
@@ -147,6 +274,7 @@ export function toPublicDocument(row) {
     status: row.status,
     error: row.error,
     chunkCount: row.chunk_count,
+    projectId: row.project_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

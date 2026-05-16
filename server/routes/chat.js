@@ -97,6 +97,7 @@ function buildContextEvent({
   rerankerSetup,
   candidateLimit,
   topK,
+  projectId,
   error,
 }) {
   const rerankerEnabled = isRerankerEnabled(rerankerSetup);
@@ -115,6 +116,7 @@ function buildContextEvent({
     rerankerEnabled,
     candidateLimit,
     topK,
+    projectId,
   };
 }
 
@@ -144,6 +146,7 @@ router.post('/', async (request, response) => {
     ? rawConversationId.trim()
     : uuidv4();
   const bodyHistory = sanitizeHistory(request.body?.history);
+  const projectId = String(request.body?.projectId ?? '').trim() || null;
   const rerankerSetup = getRerankerSetup(request.userId) ?? {};
   const candidateLimit = rerankerSetup.candidateLimit ?? CHAT_CANDIDATE_LIMIT;
   const topK = rerankerSetup.topK ?? CHAT_RETRIEVAL_LIMIT;
@@ -152,6 +155,7 @@ router.post('/', async (request, response) => {
     candidateLimit,
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
+    projectId,
   };
 
   response.setHeader('Content-Type', 'text/event-stream');
@@ -271,6 +275,7 @@ router.post('/', async (request, response) => {
           rerankerSetup,
           candidateLimit,
           topK,
+          projectId,
           error: error instanceof Error ? error.message : 'Context retrieval failed.',
         }));
         response.end();
@@ -290,6 +295,7 @@ router.post('/', async (request, response) => {
         rerankerSetup,
         candidateLimit,
         topK,
+        projectId,
       }));
     } else {
       writeSse(response, 'context', buildContextEvent({
@@ -300,6 +306,7 @@ router.post('/', async (request, response) => {
         rerankerSetup,
         candidateLimit,
         topK,
+        projectId,
       }));
     }
 

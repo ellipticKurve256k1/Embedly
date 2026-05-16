@@ -15,6 +15,7 @@ import {
 import ChatInput from './ChatInput.jsx';
 import ChatSidebar from './ChatSidebar.jsx';
 import MessageList from './MessageList.jsx';
+import ProjectSelector from './ProjectSelector.jsx';
 import SourcesPanel from './SourcesPanel.jsx';
 import SetupRequiredNotice from './SetupRequiredNotice.jsx';
 import './ChatPanel.css';
@@ -62,7 +63,13 @@ function buildServerHistory(messages) {
     }));
 }
 
-export default function ChatPanel({ settingsReady = true, missingSettings = [] }) {
+export default function ChatPanel({
+  settingsReady = true,
+  missingSettings = [],
+  projects = [],
+  selectedProjectId = null,
+  onProjectChange,
+}) {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -119,6 +126,10 @@ export default function ChatPanel({ settingsReady = true, missingSettings = [] }
     setConversationsState(savedConversations);
     return savedConversations;
   }, [setConversationsState]);
+
+  useEffect(() => {
+    resetContextState();
+  }, [resetContextState, selectedProjectId]);
 
   const persistConversation = useCallback(async (conversationId, nextMessages, overrides = {}) => {
     if (!conversationId || nextMessages.length === 0) return null;
@@ -344,6 +355,7 @@ export default function ChatPanel({ settingsReady = true, missingSettings = [] }
         message: messageText,
         conversationId,
         history,
+        projectId: selectedProjectId,
         signal: abortController.signal,
         onContext: (payload) => {
           const chunks = payload?.chunks ?? [];
@@ -431,6 +443,7 @@ export default function ChatPanel({ settingsReady = true, missingSettings = [] }
   }, [
     isStreaming,
     persistConversation,
+    selectedProjectId,
     setActiveConversationState,
     setMessagesState,
     settingsReady,
@@ -439,6 +452,15 @@ export default function ChatPanel({ settingsReady = true, missingSettings = [] }
 
   const chatContent = settingsReady ? (
     <>
+      <div className="chat-panel__toolbar">
+        <ProjectSelector
+          projects={projects}
+          value={selectedProjectId}
+          label="Dataset"
+          emptyLabel="All Documents"
+          onChange={onProjectChange}
+        />
+      </div>
       <MessageList messages={messages} isSearching={isSearching} />
       {chatError && (
         <div className="chat-panel__error" role="alert">
@@ -486,6 +508,7 @@ export default function ChatPanel({ settingsReady = true, missingSettings = [] }
             retrievalQuery={retrievalQuery}
             originalQuery={originalQuery}
             wasRewritten={wasRewritten}
+            projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
             status={contextStatus}
             onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
           />

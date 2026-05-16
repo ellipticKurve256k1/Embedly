@@ -8,7 +8,7 @@ import {
   readSavedLlmSetup,
   readSavedVectorDbSetup,
 } from './lib/storage.js';
-import { searchQuery } from './lib/api.js';
+import { getProjects, searchQuery } from './lib/api.js';
 import './index.css';
 import './App.css';
 import SettingsPage from './components/SettingsPage';
@@ -19,6 +19,7 @@ import SearchResults from './components/SearchResults';
 import ChatPanel from './components/ChatPanel';
 import LoginButton from './components/LoginButton';
 import SetupRequiredNotice from './components/SetupRequiredNotice';
+import ProjectSelector from './components/ProjectSelector';
 
 function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
   const missingSettings = [];
@@ -58,11 +59,25 @@ export default function App() {
   const [selectedResult, setSelectedResult] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   const refreshConfiguredSettings = useCallback(() => {
     setEmbeddingSetup(readSavedEmbeddingSetup());
     setLlmSetup(readSavedLlmSetup());
     setVectorDbSetup(readSavedVectorDbSetup());
+  }, []);
+
+  const refreshProjects = useCallback(async () => {
+    const payload = await getProjects();
+    const nextProjects = payload.projects ?? [];
+
+    setProjects(nextProjects);
+    setSelectedProjectId((currentProjectId) => (
+      currentProjectId && !nextProjects.some((project) => project.id === currentProjectId)
+        ? null
+        : currentProjectId
+    ));
   }, []);
 
   useEffect(() => {
@@ -80,16 +95,19 @@ export default function App() {
         setSettingsStatus('error');
       });
 
+    refreshProjects().catch(() => {});
+
     return () => {
       isMounted = false;
     };
-  }, [refreshConfiguredSettings]);
+  }, [refreshConfiguredSettings, refreshProjects]);
 
   useEffect(() => {
     const handleHashChange = () => {
       setPage(window.location.hash === '#settings' ? 'settings' : 'search');
       setMode('chat');
       refreshConfiguredSettings();
+      refreshProjects().catch(() => {});
     };
 
     const handleSettingsChange = () => {
@@ -100,17 +118,24 @@ export default function App() {
       loadSettings()
         .then(refreshConfiguredSettings)
         .catch(refreshConfiguredSettings);
+      refreshProjects().catch(() => {});
+    };
+
+    const handleProjectsChange = () => {
+      refreshProjects().catch(() => {});
     };
 
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('embeddly:settings-changed', handleSettingsChange);
     window.addEventListener('embeddly:auth-changed', handleAuthChange);
+    window.addEventListener('embeddly:projects-changed', handleProjectsChange);
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
       window.removeEventListener('embeddly:settings-changed', handleSettingsChange);
       window.removeEventListener('embeddly:auth-changed', handleAuthChange);
+      window.removeEventListener('embeddly:projects-changed', handleProjectsChange);
     };
-  }, [refreshConfiguredSettings]);
+  }, [refreshConfiguredSettings, refreshProjects]);
 
   const { settingsReady, requiredSettingsMissing } = computeSettingsStatus({
     embeddingSetup,
@@ -123,7 +148,7 @@ export default function App() {
     window.location.hash = '#settings';
   }, []);
 
-  const handleSearch = useCallback(async (queryText) => {
+  const handleSearch = useCallback(async (queryText, projectId = selectedProjectId) => {
     if (!settingsReady) return;
 
     const trimmedQuery = queryText.trim();
@@ -134,7 +159,7 @@ export default function App() {
     setSelectedResult(null);
 
     try {
-      const payload = await searchQuery(trimmedQuery);
+      const payload = await searchQuery(trimmedQuery, projectId);
       setSearchResults(payload.results ?? []);
     } catch (error) {
       setSearchError(error instanceof Error ? error.message : 'Search failed');
@@ -142,7 +167,16 @@ export default function App() {
     } finally {
       setIsSearching(false);
     }
-  }, [settingsReady]);
+  }, [selectedProjectId, settingsReady]);
+
+  const handleProjectChange = useCallback((projectId) => {
+    setSelectedProjectId(projectId);
+    setSelectedResult(null);
+
+    if (mode === 'search' && searchResults && query.trim()) {
+      handleSearch(query, projectId);
+    }
+  }, [handleSearch, mode, query, searchResults]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -220,6 +254,9 @@ export default function App() {
           <ChatPanel
             settingsReady={settingsReady}
             missingSettings={requiredSettingsMissing}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            onProjectChange={handleProjectChange}
           />
         )}
 
@@ -237,6 +274,19 @@ export default function App() {
                     <span />
                     <span />
                     <span />
+                  </div>
+                )}
+
+                {!hasResults && (
+                  <div className="search-project-row">
+                    <ProjectSelector
+                      projects={projects}
+                      value={selectedProjectId}
+                      label="Dataset"
+                      emptyLabel="All Documents"
+                      className="search-project-selector"
+                      onChange={handleProjectChange}
+                    />
                   </div>
                 )}
 
@@ -266,6 +316,9 @@ export default function App() {
                     query={query}
                     results={searchResults}
                     selectedResult={selectedResult}
+                    projects={projects}
+                    selectedProjectId={selectedProjectId}
+                    onProjectChange={handleProjectChange}
                     onSelectResult={handleSelectResult}
                     onClosePreview={handleClosePanel}
                   />
@@ -284,7 +337,11 @@ export default function App() {
           </div>
         )}
 
-        {mode === 'upload' && <UploadBox />}
+        {mode === 'upload' && (
+          <UploadBox
+            projects={projects}
+          />
+        )}
       </section>
     </main>
   );

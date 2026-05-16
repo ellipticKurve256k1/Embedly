@@ -1,10 +1,10 @@
 # Embeddly Codebase
 
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## 1. Overview
 
-Embeddly is a local-first RAG knowledge search system. Users upload private documents, move files into a knowledge base, embed parsed chunks, search semantically, and chat with retrieved context. Generation can use local Ollama models or an OpenAI-compatible external API. Settings are persisted server-side in SQLite, with API keys encrypted at rest. Optional LNURL-Auth login lets Lightning wallet users keep settings and credentials isolated in a separate credential database.
+Embeddly is a local-first RAG knowledge search system. Users upload private documents, group them into projects, embed parsed chunks, search semantically, and chat with retrieved context scoped to all documents or one selected project. Generation can use local Ollama models or an OpenAI-compatible external API. Settings are persisted server-side in SQLite, with API keys encrypted at rest. Optional LNURL-Auth login lets Lightning wallet users keep settings and credentials isolated in a separate credential database.
 
 ## 2. Technology Stack
 
@@ -78,12 +78,14 @@ App
     EmbeddingSettingsPanel
     GenerationSettingsPanel
     RetrievalSettingsPanel
+    ProjectsSettingsPanel
     VectorDbSettingsPanel
   Main view (hash: #/)
     ModeTabs
     ModelStatusBar
     LoginButton
     ChatPanel (mode: chat)
+      ProjectSelector
       ChatSidebar
         ChatSessionItem
       MessageList
@@ -93,11 +95,13 @@ App
       ChatInput
     UploadBox (mode: upload)
       FileDropZone
+      ProjectSelector
       TransferPane (available files)
       TransferControls
       TransferPane (knowledge base)
       EmbedActionBar
     SearchResults (mode: search after query)
+      ProjectSelector
       OntologyMap
       ResultPanel
 ```
@@ -121,6 +125,7 @@ Long-running embedding work currently runs inside the `/api/embed` request path 
 
 | Table | Purpose |
 |-------|---------|
+| `projects` | Named document groups used to scope chat and search retrieval. |
 | `documents` | Uploaded files, stored filenames, MIME type, size, status, error, chunk count, timestamps. |
 | `chunks` | Parsed document chunks with document id, chunk index, content, token count, timestamp. |
 | `embeddings` | Vector BLOBs linked to chunks, with model, dimensions, timestamp. |
@@ -142,6 +147,7 @@ Important relationships:
 - `chunks.document_id` references `documents.id` with cascade delete.
 - `embeddings.chunk_id` references `chunks.id` with cascade delete.
 - `embedding_jobs.document_id` references `documents.id` with cascade delete.
+- `documents.project_id` references `projects.id` with `ON DELETE SET NULL`.
 
 Global settings remain the anonymous fallback. When `req.userId` is present, settings reads check `user_settings` first and fall back to global rows by setting key. Settings writes and deletes are scoped to `user_settings` for authenticated users.
 
@@ -165,8 +171,12 @@ Settings keys:
 | `/api/auth/status` | GET | Validate a bearer token or poll a completed LNURL challenge. |
 | `/api/auth/logout` | POST | Revoke the current session. |
 | `/api/upload` | POST | Upload files and create document rows. |
-| `/api/documents` | GET | List documents. |
+| `/api/projects` | GET/POST | List projects with document counts or create a project. |
+| `/api/projects/:id` | PATCH/DELETE | Rename, describe, or delete a project. Deletion unassigns documents. |
+| `/api/projects/:id/documents` | GET | List documents assigned to one project. |
+| `/api/documents` | GET | List documents; accepts optional `projectId`. |
 | `/api/documents/:id` | GET | Fetch one document with chunks. |
+| `/api/documents/:id` | PATCH | Assign or clear a document project with `{ projectId }`. |
 | `/api/documents/:id` | DELETE | Delete a document, uploaded file, chunks, embeddings, and jobs. |
 | `/api/embed` | POST | Parse, chunk, embed, and index selected documents. |
 | `/api/jobs` | GET | List embedding jobs. |
@@ -186,8 +196,9 @@ Upload and embedding:
 User selects files
   -> POST /api/upload
   -> files are written to server/uploads
-  -> documents rows are created with pending status
+  -> documents rows are created with pending status and optional project_id
   -> user moves files into Knowledge Base pane
+  -> user can assign or batch-assign projects without re-embedding
   -> POST /api/embed
   -> parser extracts text
   -> chunker splits content
@@ -201,8 +212,9 @@ Search:
 ```text
 User submits query
   -> frontend reads cached embedding model
-  -> GET /api/search?q=...
+  -> optional selected projectId is sent to GET /api/search?q=...
   -> retrieval embeds query
+  -> retrieval SQL filters candidates by documents.project_id when selected
   -> vectors are compared in memory for candidate recall
   -> optional local reranker reorders candidates when enabled
   -> ranked chunks return to SearchResults
@@ -213,11 +225,11 @@ Chat:
 ```text
 User sends message
   -> frontend loads or creates an active IndexedDB conversation
-  -> frontend sends message, conversationId, and recent history to POST /api/chat
+  -> frontend sends message, conversationId, selected projectId, and recent history to POST /api/chat
   -> POST /api/chat
   -> server resolves saved or request-provided LLM settings
   -> server uses its hot cache or rehydrates it from request history
-  -> retrieval finds context chunks, optionally reranked by local cross-encoder
+  -> retrieval finds project-scoped context chunks, optionally reranked by local cross-encoder
   -> follow-up queries may be rewritten with recent conversation
   -> messages are built with source instructions
   -> LLM response streams as SSE tokens
@@ -236,6 +248,16 @@ App starts
   -> anonymous saves write to embedly.db settings
   -> authenticated saves write to cred.sqlite user_settings
   -> API keys are encrypted in SQLite and masked in responses
+```
+
+Projects:
+
+```text
+User creates a project in Settings
+  -> POST /api/projects writes to embedly.db projects
+  -> Upload rows can be assigned with PATCH /api/documents/:id
+  -> Chat and search send projectId when a dataset is selected
+  -> retrieval.js filters joined document rows before similarity ranking and reranking
 ```
 
 LNURL-Auth:
@@ -270,6 +292,7 @@ User clicks Connect Wallet
 | `SourceList` | `src/components/SourceList.jsx` | Collapsible source summary below assistant messages. |
 | `SourceItem` | `src/components/SourceItem.jsx` | Individual source row with cited state and document action. |
 | `ChatInput` | `src/components/ChatInput.jsx` | Collects and submits chat prompts. |
+| `ProjectSelector` | `src/components/ProjectSelector.jsx` | Shared dropdown for all-documents, no-project, and selected-project controls. |
 | `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, transfer, selection, and job polling state. |
 | `FileDropZone` | `src/components/FileDropZone.jsx` | Drag-and-drop upload control. |
 | `TransferPane` | `src/components/TransferPane.jsx` | Available or knowledge-base file list. |

@@ -1,8 +1,16 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'node:path';
+import { unlink } from 'node:fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import { insertDocument, nowIso, toPublicDocument, UPLOAD_DIR } from '../db.js';
+import {
+  getProjectById,
+  getUploadPath,
+  insertDocument,
+  nowIso,
+  toPublicDocument,
+  UPLOAD_DIR,
+} from '../db.js';
 import { normalizeFilename } from '../lib/filename.js';
 
 const router = express.Router();
@@ -39,8 +47,31 @@ const upload = multer({
   },
 });
 
-router.post('/', upload.array('files'), (request, response) => {
+async function removeUploadedFiles(files) {
+  await Promise.all((files ?? []).map(async (file) => {
+    try {
+      await unlink(getUploadPath(file.filename));
+    } catch {
+      // Best-effort cleanup for files rejected after multer writes them.
+    }
+  }));
+}
+
+function normalizeProjectId(value) {
+  const projectId = String(value ?? '').trim();
+  return projectId || null;
+}
+
+router.post('/', upload.array('files'), async (request, response) => {
   const files = request.files ?? [];
+  const projectId = normalizeProjectId(request.body?.projectId);
+
+  if (projectId && !getProjectById(projectId)) {
+    await removeUploadedFiles(files);
+    response.status(404).json({ error: 'Project not found.' });
+    return;
+  }
+
   const createdAt = nowIso();
   const documents = files.map((file) => {
     const id = uuidv4();
@@ -53,6 +84,7 @@ router.post('/', upload.array('files'), (request, response) => {
       status: 'pending',
       error: null,
       chunkCount: 0,
+      projectId,
       createdAt,
       updatedAt: createdAt,
     };
@@ -67,6 +99,7 @@ router.post('/', upload.array('files'), (request, response) => {
       status: document.status,
       error: document.error,
       chunk_count: document.chunkCount,
+      project_id: document.projectId,
       created_at: document.createdAt,
       updated_at: document.updatedAt,
     });

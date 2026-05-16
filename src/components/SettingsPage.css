@@ -646,6 +646,96 @@
   stroke-width: 2;
 }
 
+.project-settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.project-settings-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 26px rgba(76, 88, 139, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.project-settings-card__count {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border-radius: 12px;
+  color: #6258ff;
+  background: rgba(107, 92, 255, 0.1);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.project-settings-card__count span {
+  color: #8c96ad;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.project-settings-card__fields {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.project-settings-card__fields input {
+  min-width: 0;
+  min-height: 38px;
+  width: 100%;
+  padding: 0 11px;
+  border: 1px solid rgba(132, 146, 184, 0.2);
+  border-radius: 10px;
+  color: #24304b;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.project-settings-card__fields input:first-child {
+  font-weight: 850;
+}
+
+.project-settings-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-settings-card__actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 10px;
+  color: #6258ff;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.project-settings-card__actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.project-settings-card__actions .is-danger {
+  color: #9f4452;
+}
+
 @media (max-width: 680px) {
   .settings-content {
     gap: 8px;
@@ -743,5 +833,17 @@
   .save-button {
     min-height: 56px;
     font-size: 15px;
+  }
+
+  .project-settings-card {
+    grid-template-columns: 1fr;
+  }
+
+  .project-settings-card__actions {
+    align-items: stretch;
+  }
+
+  .project-settings-card__actions button {
+    flex: 1;
   }
 }

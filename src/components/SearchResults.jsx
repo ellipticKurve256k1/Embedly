@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { FileText, Award, CircleDot, Hash } from 'lucide-react';
+import ProjectSelector from './ProjectSelector.jsx';
 import './SearchResults.css';
 
 function formatScore(score) {
@@ -16,9 +17,14 @@ export default function SearchResults({
   query,
   results,
   selectedResult,
+  projects = [],
+  selectedProjectId = null,
+  onProjectChange,
   onSelectResult,
   onClosePreview,
 }) {
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+
   // Auto-select first result when a new search returns
   useEffect(() => {
     if (results && results.length > 0) {
@@ -44,8 +50,19 @@ export default function SearchResults({
           <div className="result-list-title">
             {results.length} result{results.length !== 1 ? 's' : ''}
           </div>
+          <ProjectSelector
+            projects={projects}
+            value={selectedProjectId}
+            label="Dataset"
+            emptyLabel="All Documents"
+            className="result-project-selector"
+            onChange={onProjectChange}
+          />
           <div className="result-list-query" title={query}>
             &ldquo;{query}&rdquo;
+          </div>
+          <div className="result-list-project">
+            {selectedProject ? selectedProject.name : 'All Documents'}
           </div>
         </header>
 
@@ -103,6 +120,9 @@ export default function SearchResults({
                     <span className="result-item-meta">
                       Chunk {result.chunkIndex != null ? result.chunkIndex + 1 : '—'}
                     </span>
+                    {result.projectName && (
+                      <span className="result-item-meta">{result.projectName}</span>
+                    )}
                     {typeof result.rerankScore === 'number' && (
                       <span className="result-item-rerank-meta">
                         Embedding {formatDecimalScore(result.score)} · Rerank {formatDecimalScore(result.rerankScore)}

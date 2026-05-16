@@ -31,6 +31,11 @@
   gap: clamp(10px, 1.5vh, 14px);
 }
 
+.upload-project-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .file-drop-zone {
   min-width: 0;
   min-height: 74px;
@@ -357,6 +362,26 @@
   font-weight: 780;
 }
 
+.transfer-project-badge {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: #6258ff;
+  background: rgba(107, 92, 255, 0.1);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.transfer-project-badge.is-empty {
+  color: #8c96ad;
+  background: rgba(132, 146, 184, 0.12);
+}
+
 .transfer-row-meta {
   min-width: 0;
   display: flex;
@@ -472,6 +497,17 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.transfer-project-select {
+  max-width: 132px;
+  min-height: 32px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 10px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .transfer-row-action,
@@ -635,6 +671,39 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+.project-assignment-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 24px rgba(76, 88, 139, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.project-assignment-bar > span {
+  color: #65718b;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.project-assignment-bar button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7368ff, #5144f1);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
 .embed-action-summary {
   min-width: 0;
   display: grid;
@@ -756,7 +825,7 @@
   }
 
   .transfer-row {
-    grid-template-columns: 28px minmax(0, 1fr) 34px;
+    grid-template-columns: 28px minmax(0, 1fr);
   }
 
   .transfer-row-meta {
@@ -765,12 +834,17 @@
   }
 
   .transfer-row-actions {
-    grid-column: 3;
-    grid-row: 1;
+    grid-column: 2 / 3;
+    grid-row: auto;
+    justify-content: flex-start;
   }
 
   .transfer-row-action span {
     display: none;
+  }
+
+  .transfer-project-select {
+    max-width: min(180px, 100%);
   }
 }
 
@@ -812,6 +886,12 @@
 
   .embed-action-buttons {
     width: 100%;
+  }
+
+  .upload-project-toolbar,
+  .project-assignment-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .embed-primary-button,

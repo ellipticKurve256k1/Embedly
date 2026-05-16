@@ -7,6 +7,7 @@ import chatRouter from './routes/chat.js';
 import documentsRouter from './routes/documents.js';
 import embedRouter from './routes/embed.js';
 import jobsRouter from './routes/jobs.js';
+import projectsRouter from './routes/projects.js';
 import searchRouter from './routes/search.js';
 import settingsRouter from './routes/settings.js';
 import uploadRouter from './routes/upload.js';
@@ -29,6 +30,7 @@ app.use('/api/chat', chatRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/embed', embedRouter);
 app.use('/api/jobs', jobsRouter);
+app.use('/api/projects', projectsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/settings', settingsRouter);
 

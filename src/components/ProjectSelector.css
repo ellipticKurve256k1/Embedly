@@ -1,0 +1,53 @@
+.project-selector {
+  min-width: 180px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border: 1px solid rgba(132, 146, 184, 0.18);
+  border-radius: 12px;
+  color: #65718b;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 10px 20px rgba(76, 88, 139, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.project-selector__label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6258ff;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.project-selector__label svg {
+  flex: 0 0 auto;
+}
+
+.project-selector select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #24304b;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-selector select:disabled {
+  color: #9aa4b8;
+  cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+  .project-selector {
+    width: 100%;
+  }
+}

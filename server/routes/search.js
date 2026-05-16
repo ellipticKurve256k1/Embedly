@@ -10,6 +10,7 @@ const SEARCH_RETRIEVAL_LIMIT = 5;
 
 router.get('/', async (request, response) => {
   const query = String(request.query.q ?? '').trim();
+  const projectId = String(request.query.projectId ?? '').trim() || null;
 
   if (!query) {
     response.status(400).json({ error: 'Search query is required.' });
@@ -26,6 +27,7 @@ router.get('/', async (request, response) => {
     candidateLimit,
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
+    projectId,
   });
   const rerankerUsed = results.some((result) => typeof result.rerankScore === 'number');
 
@@ -36,6 +38,7 @@ router.get('/', async (request, response) => {
     rerankerModel: rerankerUsed ? rerankerSetup.model : null,
     candidateLimit,
     topK,
+    projectId,
   });
 });
 

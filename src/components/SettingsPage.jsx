@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CircleHelp,
   Database,
+  FolderKanban,
   RefreshCw,
   Save,
   Search,
@@ -13,6 +14,12 @@ import {
   Zap,
 } from 'lucide-react';
 import logoSrc from '../../references/embedly.png';
+import {
+  createProject,
+  deleteProject,
+  getProjects,
+  updateProject,
+} from '../lib/api.js';
 import {
   readSavedEmbeddingSetup,
   readSavedChunkingConfig,
@@ -34,6 +41,7 @@ const DEFAULT_OPENAI_COMPATIBLE_ENDPOINT = 'https://api.openai.com/v1';
 const settingTabs = [
   { id: 'embedding', label: 'Embedding Model', icon: Zap },
   { id: 'retrieval', label: 'Retrieval', icon: Search },
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'generation', label: 'Generation', icon: WandSparkles },
   { id: 'vector-db', label: 'VectorDB', icon: Database },
   // { id: 'data-sources', label: 'Data Sources', icon: Database },
@@ -140,6 +148,11 @@ export default function SettingsPage() {
   );
   const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
   const [rerankerConfig, setRerankerConfig] = useState(readSavedRerankerSetup);
+  const [projects, setProjects] = useState([]);
+  const [projectDraft, setProjectDraft] = useState({ name: '', description: '' });
+  const [projectEdits, setProjectEdits] = useState({});
+  const [projectStatus, setProjectStatus] = useState({ type: null, message: '' });
+  const [projectActionId, setProjectActionId] = useState(null);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const [savingSection, setSavingSection] = useState(null);
   const [saveStatus, setSaveStatus] = useState({ section: null, type: null, message: '' });
@@ -151,6 +164,22 @@ export default function SettingsPage() {
     (provider) => provider.id === selectedVectorDbProvider,
   );
   const ActiveVectorDbSetup = activeVectorDbProvider?.component;
+
+  const refreshProjects = useCallback(async () => {
+    const payload = await getProjects();
+    const nextProjects = payload.projects ?? [];
+
+    setProjects(nextProjects);
+    setProjectEdits(Object.fromEntries(
+      nextProjects.map((project) => [
+        project.id,
+        {
+          name: project.name,
+          description: project.description ?? '',
+        },
+      ]),
+    ));
+  }, []);
 
   const syncSettingsFromCache = useCallback(() => {
     const nextEmbeddingSetup = readSavedEmbeddingSetup();
@@ -198,6 +227,19 @@ export default function SettingsPage() {
       window.removeEventListener('embeddly:auth-changed', handleAuthChange);
     };
   }, [syncSettingsFromCache]);
+
+  useEffect(() => {
+    refreshProjects().catch((error) => {
+      setProjectStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to load projects.',
+      });
+    });
+  }, [refreshProjects]);
+
+  const notifyProjectsChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('embeddly:projects-changed'));
+  }, []);
 
   const saveWithStatus = useCallback(async (section, action, successMessage) => {
     setSavingSection(section);
@@ -315,6 +357,93 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCreateProject = async () => {
+    const name = projectDraft.name.trim();
+
+    if (!name) {
+      setProjectStatus({ type: 'error', message: 'Project name is required.' });
+      return;
+    }
+
+    setProjectActionId('new');
+    setProjectStatus({ type: null, message: '' });
+
+    try {
+      await createProject({
+        name,
+        description: projectDraft.description.trim(),
+      });
+      setProjectDraft({ name: '', description: '' });
+      await refreshProjects();
+      notifyProjectsChanged();
+      setProjectStatus({ type: 'success', message: 'Project created.' });
+    } catch (error) {
+      setProjectStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create project.',
+      });
+    } finally {
+      setProjectActionId(null);
+    }
+  };
+
+  const handleUpdateProject = async (projectId) => {
+    const edit = projectEdits[projectId] ?? {};
+    const name = String(edit.name ?? '').trim();
+
+    if (!name) {
+      setProjectStatus({ type: 'error', message: 'Project name is required.' });
+      return;
+    }
+
+    setProjectActionId(projectId);
+    setProjectStatus({ type: null, message: '' });
+
+    try {
+      await updateProject(projectId, {
+        name,
+        description: String(edit.description ?? '').trim(),
+      });
+      await refreshProjects();
+      notifyProjectsChanged();
+      setProjectStatus({ type: 'success', message: 'Project updated.' });
+    } catch (error) {
+      setProjectStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to update project.',
+      });
+    } finally {
+      setProjectActionId(null);
+    }
+  };
+
+  const handleDeleteProject = async (project) => {
+    const confirmed = window.confirm(
+      `Delete "${project.name}"? Documents in this project will become unassigned.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setProjectActionId(project.id);
+    setProjectStatus({ type: null, message: '' });
+
+    try {
+      await deleteProject(project.id);
+      await refreshProjects();
+      notifyProjectsChanged();
+      setProjectStatus({ type: 'success', message: 'Project deleted. Documents were unassigned.' });
+    } catch (error) {
+      setProjectStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to delete project.',
+      });
+    } finally {
+      setProjectActionId(null);
+    }
+  };
+
   return (
     <main className="app">
       <section className="landing-shell settings-shell" aria-label="Embeddly settings">
@@ -412,6 +541,21 @@ export default function SettingsPage() {
               />
             )}
 
+            {activeSection === 'projects' && (
+              <ProjectsSettingsPanel
+                projects={projects}
+                projectDraft={projectDraft}
+                projectEdits={projectEdits}
+                projectStatus={projectStatus}
+                projectActionId={projectActionId}
+                onDraftChange={setProjectDraft}
+                onEditChange={setProjectEdits}
+                onCreate={handleCreateProject}
+                onUpdate={handleUpdateProject}
+                onDelete={handleDeleteProject}
+              />
+            )}
+
             {activeSection === 'vector-db' && (
               <VectorDbSettingsPanel
                 selectedProvider={selectedVectorDbProvider}
@@ -424,6 +568,7 @@ export default function SettingsPage() {
             {activeSection !== 'embedding'
               && activeSection !== 'generation'
               && activeSection !== 'retrieval'
+              && activeSection !== 'projects'
               && activeSection !== 'vector-db' && (
               <PlaceholderSettingsPanel section={settingTabs.find((tab) => tab.id === activeSection)} />
             )}
@@ -678,6 +823,158 @@ function RetrievalSettingsPanel({
         onClick={onSave}
       />
       <SaveStatusMessage status={saveStatus} />
+    </section>
+  );
+}
+
+function ProjectsSettingsPanel({
+  projects,
+  projectDraft,
+  projectEdits,
+  projectStatus,
+  projectActionId,
+  onDraftChange,
+  onEditChange,
+  onCreate,
+  onUpdate,
+  onDelete,
+}) {
+  const updateProjectEdit = (projectId, field, value) => {
+    onEditChange((currentEdits) => ({
+      ...currentEdits,
+      [projectId]: {
+        ...currentEdits[projectId],
+        [field]: value,
+      },
+    }));
+  };
+
+  return (
+    <section className="settings-detail" aria-labelledby="projects-title">
+      <div className="settings-detail-heading">
+        <h2 id="projects-title">Projects</h2>
+        <p>Create datasets that keep search and chat retrieval focused on a selected document group.</p>
+      </div>
+
+      <div className="settings-subsection">
+        <div className="settings-subsection-heading">
+          <h3>New project</h3>
+          <p>Documents can stay unassigned until you move them into a project.</p>
+        </div>
+
+        <div className="settings-field-grid">
+          <label className="settings-field">
+            <span>
+              <strong>Name</strong>
+              <small>Use a short dataset name that is easy to scan in selectors.</small>
+            </span>
+            <input
+              type="text"
+              value={projectDraft.name}
+              placeholder="React docs"
+              onChange={(event) => onDraftChange({
+                ...projectDraft,
+                name: event.target.value,
+              })}
+            />
+          </label>
+
+          <label className="settings-field">
+            <span>
+              <strong>Description</strong>
+              <small>Optional note for the project list.</small>
+            </span>
+            <input
+              type="text"
+              value={projectDraft.description}
+              placeholder="Source notes and product docs"
+              onChange={(event) => onDraftChange({
+                ...projectDraft,
+                description: event.target.value,
+              })}
+            />
+          </label>
+        </div>
+
+        <SaveSettingsButton
+          disabled={projectActionId === 'new'}
+          isSaving={projectActionId === 'new'}
+          label={projectActionId === 'new' ? 'Creating...' : 'Create project'}
+          onClick={onCreate}
+        />
+      </div>
+
+      <div className="settings-subsection">
+        <div className="settings-subsection-heading">
+          <h3>Project list</h3>
+          <p>Deleting a project leaves its documents available under All Documents.</p>
+        </div>
+
+        <div className="project-settings-list">
+          {projects.length === 0 ? (
+            <div className="setup-message">
+              <FolderKanban size={18} />
+              <span>
+                No projects yet
+                <small>Create a project to start grouping uploaded documents.</small>
+              </span>
+            </div>
+          ) : (
+            projects.map((project) => {
+              const edit = projectEdits[project.id] ?? {
+                name: project.name,
+                description: project.description ?? '',
+              };
+              const isBusy = projectActionId === project.id;
+
+              return (
+                <article className="project-settings-card" key={project.id}>
+                  <div className="project-settings-card__count">
+                    {project.documentCount}
+                    <span>docs</span>
+                  </div>
+
+                  <div className="project-settings-card__fields">
+                    <input
+                      type="text"
+                      value={edit.name}
+                      aria-label={`Name for ${project.name}`}
+                      onChange={(event) => updateProjectEdit(project.id, 'name', event.target.value)}
+                    />
+                    <input
+                      type="text"
+                      value={edit.description}
+                      aria-label={`Description for ${project.name}`}
+                      placeholder="No description"
+                      onChange={(event) => updateProjectEdit(project.id, 'description', event.target.value)}
+                    />
+                  </div>
+
+                  <div className="project-settings-card__actions">
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => onUpdate(project.id)}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="is-danger"
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => onDelete(project)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <SaveStatusMessage status={projectStatus} />
     </section>
   );
 }
