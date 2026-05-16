@@ -85,7 +85,7 @@ App
     ModelStatusBar
     LoginButton
     ChatPanel (mode: chat)
-      ProjectSelector
+      DatasetScopeControl
       ChatSidebar
         ChatSessionItem
       MessageList
@@ -96,12 +96,13 @@ App
     UploadBox (mode: upload)
       FileDropZone
       ProjectSelector
+      ProjectChip
       TransferPane (available files)
       TransferControls
       TransferPane (knowledge base)
       EmbedActionBar
     SearchResults (mode: search after query)
-      ProjectSelector
+      DatasetScopeControl
       OntologyMap
       ResultPanel
 ```
@@ -292,7 +293,9 @@ User clicks Connect Wallet
 | `SourceList` | `src/components/SourceList.jsx` | Collapsible source summary below assistant messages. |
 | `SourceItem` | `src/components/SourceItem.jsx` | Individual source row with cited state and document action. |
 | `ChatInput` | `src/components/ChatInput.jsx` | Collects and submits chat prompts. |
-| `ProjectSelector` | `src/components/ProjectSelector.jsx` | Shared dropdown for all-documents, no-project, and selected-project controls. |
+| `DatasetScopeControl` | `src/components/DatasetScopeControl.jsx` | Prominent chat/search scope selector with project identity, counts, and settings link. |
+| `ProjectChip` | `src/components/ProjectChip.jsx` | Reusable project identity token with deterministic initials color, counts, all-documents, and unassigned states. |
+| `ProjectSelector` | `src/components/ProjectSelector.jsx` | Compact native dropdown for upload assignment controls. |
 | `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, transfer, selection, and job polling state. |
 | `FileDropZone` | `src/components/FileDropZone.jsx` | Drag-and-drop upload control. |
 | `TransferPane` | `src/components/TransferPane.jsx` | Available or knowledge-base file list. |

@@ -5,10 +5,12 @@ import {
   CircleHelp,
   Database,
   FolderKanban,
+  FolderOpen,
   RefreshCw,
   Save,
   Search,
   Server,
+  Trash2,
   WandSparkles,
   X,
   Zap,
@@ -33,6 +35,7 @@ import {
   saveVectorDbSetup,
 } from '../lib/storage.js';
 import LoginButton from './LoginButton';
+import ProjectChip from './ProjectChip.jsx';
 import './SettingsPage.css';
 
 const OLLAMA_BASE_URL = 'http://localhost:11434';
@@ -122,6 +125,20 @@ function getSaveStatus(section, saveStatus) {
   return saveStatus;
 }
 
+function formatProjectDate(value) {
+  const date = new Date(value);
+
+  if (!value || Number.isNaN(date.getTime())) {
+    return 'Created date unknown';
+  }
+
+  return `Created ${new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(date)}`;
+}
+
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('embedding');
   const [embeddingSetup, setEmbeddingSetup] = useState(readSavedEmbeddingSetup);
@@ -153,6 +170,7 @@ export default function SettingsPage() {
   const [projectEdits, setProjectEdits] = useState({});
   const [projectStatus, setProjectStatus] = useState({ type: null, message: '' });
   const [projectActionId, setProjectActionId] = useState(null);
+  const [projectDeleteId, setProjectDeleteId] = useState(null);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const [savingSection, setSavingSection] = useState(null);
   const [saveStatus, setSaveStatus] = useState({ section: null, type: null, message: '' });
@@ -418,14 +436,6 @@ export default function SettingsPage() {
   };
 
   const handleDeleteProject = async (project) => {
-    const confirmed = window.confirm(
-      `Delete "${project.name}"? Documents in this project will become unassigned.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setProjectActionId(project.id);
     setProjectStatus({ type: null, message: '' });
 
@@ -433,6 +443,7 @@ export default function SettingsPage() {
       await deleteProject(project.id);
       await refreshProjects();
       notifyProjectsChanged();
+      setProjectDeleteId(null);
       setProjectStatus({ type: 'success', message: 'Project deleted. Documents were unassigned.' });
     } catch (error) {
       setProjectStatus({
@@ -548,8 +559,10 @@ export default function SettingsPage() {
                 projectEdits={projectEdits}
                 projectStatus={projectStatus}
                 projectActionId={projectActionId}
+                projectDeleteId={projectDeleteId}
                 onDraftChange={setProjectDraft}
                 onEditChange={setProjectEdits}
+                onDeleteRequest={setProjectDeleteId}
                 onCreate={handleCreateProject}
                 onUpdate={handleUpdateProject}
                 onDelete={handleDeleteProject}
@@ -833,8 +846,10 @@ function ProjectsSettingsPanel({
   projectEdits,
   projectStatus,
   projectActionId,
+  projectDeleteId,
   onDraftChange,
   onEditChange,
+  onDeleteRequest,
   onCreate,
   onUpdate,
   onDelete,
@@ -869,6 +884,7 @@ function ProjectsSettingsPanel({
               <small>Use a short dataset name that is easy to scan in selectors.</small>
             </span>
             <input
+              id="new-project-name"
               type="text"
               value={projectDraft.name}
               placeholder="React docs"
@@ -912,12 +928,19 @@ function ProjectsSettingsPanel({
 
         <div className="project-settings-list">
           {projects.length === 0 ? (
-            <div className="setup-message">
-              <FolderKanban size={18} />
-              <span>
-                No projects yet
-                <small>Create a project to start grouping uploaded documents.</small>
-              </span>
+            <div className="project-empty-state">
+              <FolderOpen size={40} />
+              <strong>No projects yet</strong>
+              <p>
+                Projects let you scope chat and search to specific document sets.
+                Create one to get started.
+              </p>
+              <button
+                type="button"
+                onClick={() => document.getElementById('new-project-name')?.focus()}
+              >
+                Create project
+              </button>
             </div>
           ) : (
             projects.map((project) => {
@@ -926,12 +949,15 @@ function ProjectsSettingsPanel({
                 description: project.description ?? '',
               };
               const isBusy = projectActionId === project.id;
+              const isConfirmingDelete = projectDeleteId === project.id;
 
               return (
-                <article className="project-settings-card" key={project.id}>
-                  <div className="project-settings-card__count">
-                    {project.documentCount}
-                    <span>docs</span>
+                <article
+                  className={`project-settings-card${isConfirmingDelete ? ' is-confirming-delete' : ''}`}
+                  key={project.id}
+                >
+                  <div className="project-settings-card__identity">
+                    <ProjectChip project={project} variant="settings" showCount />
                   </div>
 
                   <div className="project-settings-card__fields">
@@ -948,29 +974,63 @@ function ProjectsSettingsPanel({
                       placeholder="No description"
                       onChange={(event) => updateProjectEdit(project.id, 'description', event.target.value)}
                     />
+                    <span className="project-settings-card__meta">
+                      {project.documentCount} document{project.documentCount === 1 ? '' : 's'} · {formatProjectDate(project.createdAt)}
+                    </span>
                   </div>
 
                   <div className="project-settings-card__actions">
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => onUpdate(project.id)}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="is-danger"
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => onDelete(project)}
-                    >
-                      Delete
-                    </button>
+                    {isConfirmingDelete ? (
+                      <>
+                        <span className="project-settings-card__confirm">
+                          Delete project? Documents become unassigned.
+                        </span>
+                        <button
+                          className="is-danger"
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onDelete(project)}
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onDeleteRequest(null)}
+                        >
+                          Keep
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onUpdate(project.id)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="is-danger"
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onDeleteRequest(project.id)}
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </article>
               );
             })
           )}
+        </div>
+        <div className="project-settings-helper">
+          <AlertCircle size={16} />
+          <span>Documents without a project remain searchable under All Documents.</span>
         </div>
       </div>
 

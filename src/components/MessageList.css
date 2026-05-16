@@ -238,6 +238,21 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+.message-list__system {
+  align-self: center;
+  max-width: min(620px, 100%);
+  padding: 8px 13px;
+  border: 1px solid rgba(98, 88, 255, 0.16);
+  border-radius: 999px;
+  color: #6258ff;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 20px rgba(76, 88, 139, 0.08);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-align: center;
+}
+
 @media (max-width: 680px) {
   .message-list {
     padding: 12px 2px;

@@ -19,7 +19,7 @@ import SearchResults from './components/SearchResults';
 import ChatPanel from './components/ChatPanel';
 import LoginButton from './components/LoginButton';
 import SetupRequiredNotice from './components/SetupRequiredNotice';
-import ProjectSelector from './components/ProjectSelector';
+import DatasetScopeControl from './components/DatasetScopeControl';
 
 function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
   const missingSettings = [];
@@ -61,6 +61,7 @@ export default function App() {
   const [searchError, setSearchError] = useState('');
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [scopeNotice, setScopeNotice] = useState(null);
 
   const refreshConfiguredSettings = useCallback(() => {
     setEmbeddingSetup(readSavedEmbeddingSetup());
@@ -172,11 +173,24 @@ export default function App() {
   const handleProjectChange = useCallback((projectId) => {
     setSelectedProjectId(projectId);
     setSelectedResult(null);
+    const nextProject = projects.find((project) => project.id === projectId);
+    const nextScopeName = nextProject?.name ?? 'All Documents';
+    const noticeId = `${projectId ?? 'all'}-${Date.now()}`;
+
+    setScopeNotice({
+      id: noticeId,
+      message: `Now retrieving from ${nextScopeName}.`,
+    });
+    window.setTimeout(() => {
+      setScopeNotice((currentNotice) => (
+        currentNotice?.id === noticeId ? null : currentNotice
+      ));
+    }, 2000);
 
     if (mode === 'search' && searchResults && query.trim()) {
       handleSearch(query, projectId);
     }
-  }, [handleSearch, mode, query, searchResults]);
+  }, [handleSearch, mode, projects, query, searchResults]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -256,6 +270,7 @@ export default function App() {
             missingSettings={requiredSettingsMissing}
             projects={projects}
             selectedProjectId={selectedProjectId}
+            scopeFlashKey={scopeNotice?.id}
             onProjectChange={handleProjectChange}
           />
         )}
@@ -277,19 +292,6 @@ export default function App() {
                   </div>
                 )}
 
-                {!hasResults && (
-                  <div className="search-project-row">
-                    <ProjectSelector
-                      projects={projects}
-                      value={selectedProjectId}
-                      label="Dataset"
-                      emptyLabel="All Documents"
-                      className="search-project-selector"
-                      onChange={handleProjectChange}
-                    />
-                  </div>
-                )}
-
                 <label className="search-box">
                   <Search size={20} />
                   <input
@@ -304,6 +306,22 @@ export default function App() {
                     <LoaderCircle size={20} className="search-spinner" />
                   )}
                 </label>
+
+                <div className="search-scope-row">
+                  <DatasetScopeControl
+                    projects={projects}
+                    value={selectedProjectId}
+                    label="Dataset Scope"
+                    contextLabel="Dataset"
+                    flashKey={scopeNotice?.id}
+                    onChange={handleProjectChange}
+                  />
+                  {scopeNotice && (
+                    <div className="scope-feedback" role="status">
+                      {scopeNotice.message}
+                    </div>
+                  )}
+                </div>
 
                 {searchError && (
                   <div className="search-error" role="alert">

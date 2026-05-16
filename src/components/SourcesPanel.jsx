@@ -1,4 +1,5 @@
 import { FileText, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
+import ProjectChip from './ProjectChip.jsx';
 import './SourcesPanel.css';
 
 function formatScore(score) {
@@ -18,6 +19,7 @@ export default function SourcesPanel({
   retrievalQuery,
   originalQuery,
   wasRewritten,
+  project,
   projectName,
   status,
   onClose,
@@ -52,15 +54,23 @@ export default function SourcesPanel({
             </div>
           )}
 
+          <div className="sources-panel__scope">
+            <span>Scope</span>
+            <ProjectChip
+              project={project ?? null}
+              label={projectName ?? 'All Documents'}
+              documentCount={project?.documentCount}
+              variant="compact"
+              showCount={Boolean(project)}
+            />
+          </div>
+
           {retrievalQuery && (
             <div className="sources-panel__query">
               <span>{wasRewritten ? 'Rewritten query' : 'Searched for'}</span>
               <p>{retrievalQuery}</p>
               {wasRewritten && originalQuery && (
                 <small className="sources-panel__original">Original: "{originalQuery}"</small>
-              )}
-              {projectName && (
-                <small className="sources-panel__original">Dataset: {projectName}</small>
               )}
             </div>
           )}

@@ -100,6 +100,14 @@ export default function MessageList({ messages, isSearching }) {
     <div className="message-list" ref={listRef}>
       <div className="message-list__items">
         {messages.map((message) => {
+          if (message.role === 'system') {
+            return (
+              <div className="message-list__system" key={message.id} role="status">
+                {message.content}
+              </div>
+            );
+          }
+
           const isAssistant = message.role === 'assistant';
           const Icon = isAssistant ? Bot : UserRound;
 

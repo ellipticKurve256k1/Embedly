@@ -654,9 +654,9 @@
 .project-settings-card {
   min-width: 0;
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 14px 16px;
   border: 1px solid rgba(132, 146, 184, 0.18);
   border-radius: 14px;
@@ -664,26 +664,28 @@
   box-shadow:
     0 12px 26px rgba(76, 88, 139, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-.project-settings-card__count {
-  min-height: 48px;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 2px;
-  border-radius: 12px;
-  color: #6258ff;
-  background: rgba(107, 92, 255, 0.1);
-  font-size: 18px;
-  font-weight: 900;
+.project-settings-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 32px rgba(76, 88, 139, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.project-settings-card__count span {
-  color: #8c96ad;
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
+.project-settings-card.is-confirming-delete {
+  border-color: rgba(210, 83, 100, 0.34);
+  background:
+    linear-gradient(135deg, rgba(210, 83, 100, 0.08), rgba(255, 255, 255, 0.78) 36%),
+    rgba(255, 255, 255, 0.82);
+}
+
+.project-settings-card__identity {
+  min-width: 0;
 }
 
 .project-settings-card__fields {
@@ -709,14 +711,26 @@
   font-weight: 850;
 }
 
+.project-settings-card__meta {
+  color: #8c96ad;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .project-settings-card__actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .project-settings-card__actions button {
   min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 12px;
   border: 1px solid rgba(132, 146, 184, 0.22);
   border-radius: 10px;
@@ -734,6 +748,73 @@
 
 .project-settings-card__actions .is-danger {
   color: #9f4452;
+}
+
+.project-settings-card__confirm {
+  flex-basis: 100%;
+  color: #9f4452;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.project-empty-state {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  border: 1px dashed rgba(132, 146, 184, 0.24);
+  border-radius: 16px;
+  color: #8c96ad;
+  background: rgba(255, 255, 255, 0.56);
+  text-align: center;
+}
+
+.project-empty-state svg {
+  color: #8c96ad;
+}
+
+.project-empty-state strong {
+  color: #24304b;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.project-empty-state p {
+  max-width: 320px;
+  margin: 0;
+  color: #6f7a94;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.project-empty-state button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7368ff, #5144f1);
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.project-settings-helper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #6f7a94;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.project-settings-helper svg {
+  color: #6258ff;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 680px) {

@@ -1,5 +1,6 @@
 import { LoaderCircle, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import FileIcon from './FileIcon.jsx';
+import ProjectChip from './ProjectChip.jsx';
 
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
 
@@ -115,9 +116,15 @@ export default function FileTransferRow({
         <FileIcon filename={document.filename} mimeType={document.mimeType} size={17} />
         <div className="transfer-row-title">
           <strong>{document.filename}</strong>
-          <span>{formatSize(document.sizeBytes)}</span>
-          <span className={`transfer-project-badge${project ? '' : ' is-empty'}`}>
-            {project?.name ?? 'No project'}
+          <span className="transfer-row-submeta">
+            <ProjectChip
+              project={project}
+              label={project?.name ?? 'No project'}
+              state={project ? 'project' : 'unassigned'}
+              variant="compact"
+            />
+            <span className="transfer-meta-separator" aria-hidden="true">·</span>
+            <span>{formatSize(document.sizeBytes)}</span>
           </span>
         </div>
       </div>
@@ -136,19 +143,22 @@ export default function FileTransferRow({
       </div>
 
       <div className="transfer-row-actions">
-        <select
-          className="transfer-project-select"
-          value={document.projectId ?? ''}
-          aria-label={`Project for ${document.filename}`}
-          onChange={(event) => onProjectChange?.(document, event.target.value || null)}
-        >
-          <option value="">No project</option>
-          {projects.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
+        <label className="transfer-project-control">
+          <span>Assign</span>
+          <select
+            className="transfer-project-select"
+            value={document.projectId ?? ''}
+            aria-label={`Project for ${document.filename}`}
+            onChange={(event) => onProjectChange?.(document, event.target.value || null)}
+          >
+            <option value="">No project</option>
+            {projects.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {(showRetry || showReembed) && (
           <button

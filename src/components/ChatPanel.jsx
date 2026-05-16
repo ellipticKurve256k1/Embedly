@@ -15,7 +15,7 @@ import {
 import ChatInput from './ChatInput.jsx';
 import ChatSidebar from './ChatSidebar.jsx';
 import MessageList from './MessageList.jsx';
-import ProjectSelector from './ProjectSelector.jsx';
+import DatasetScopeControl from './DatasetScopeControl.jsx';
 import SourcesPanel from './SourcesPanel.jsx';
 import SetupRequiredNotice from './SetupRequiredNotice.jsx';
 import './ChatPanel.css';
@@ -68,6 +68,7 @@ export default function ChatPanel({
   missingSettings = [],
   projects = [],
   selectedProjectId = null,
+  scopeFlashKey,
   onProjectChange,
 }) {
   const [inputValue, setInputValue] = useState('');
@@ -92,6 +93,7 @@ export default function ChatPanel({
   const messagesRef = useRef([]);
   const conversationsRef = useRef([]);
   const activeConversationIdRef = useRef(null);
+  const previousProjectIdRef = useRef(undefined);
 
   const setMessagesState = useCallback((nextMessages) => {
     messagesRef.current = nextMessages;
@@ -130,6 +132,30 @@ export default function ChatPanel({
   useEffect(() => {
     resetContextState();
   }, [resetContextState, selectedProjectId]);
+
+  useEffect(() => {
+    if (previousProjectIdRef.current === undefined) {
+      previousProjectIdRef.current = selectedProjectId;
+      return;
+    }
+
+    if (previousProjectIdRef.current === selectedProjectId) {
+      return;
+    }
+
+    previousProjectIdRef.current = selectedProjectId;
+
+    if (messagesRef.current.length === 0) {
+      return;
+    }
+
+    const selectedProject = projects.find((project) => project.id === selectedProjectId);
+    const scopeName = selectedProject?.name ?? 'All Documents';
+    setMessagesState([
+      ...messagesRef.current,
+      createMessage('system', `Retrieval scope changed to ${scopeName}.`),
+    ]);
+  }, [projects, selectedProjectId, setMessagesState]);
 
   const persistConversation = useCallback(async (conversationId, nextMessages, overrides = {}) => {
     if (!conversationId || nextMessages.length === 0) return null;
@@ -450,14 +476,17 @@ export default function ChatPanel({
     updateAssistantMessage,
   ]);
 
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+
   const chatContent = settingsReady ? (
     <>
-      <div className="chat-panel__toolbar">
-        <ProjectSelector
+      <div className="chat-panel__scope">
+        <DatasetScopeControl
           projects={projects}
           value={selectedProjectId}
-          label="Dataset"
-          emptyLabel="All Documents"
+          label="Dataset Scope"
+          contextLabel="Retrieving from"
+          flashKey={scopeFlashKey}
           onChange={onProjectChange}
         />
       </div>
@@ -508,7 +537,8 @@ export default function ChatPanel({
             retrievalQuery={retrievalQuery}
             originalQuery={originalQuery}
             wasRewritten={wasRewritten}
-            projectName={projects.find((project) => project.id === selectedProjectId)?.name ?? null}
+            project={selectedProject}
+            projectName={selectedProject?.name ?? 'All Documents'}
             status={contextStatus}
             onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
           />

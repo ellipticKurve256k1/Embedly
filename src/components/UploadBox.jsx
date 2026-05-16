@@ -9,6 +9,7 @@ import {
 } from '../lib/api.js';
 import EmbedActionBar from './EmbedActionBar.jsx';
 import FileDropZone from './FileDropZone.jsx';
+import ProjectChip from './ProjectChip.jsx';
 import ProjectSelector from './ProjectSelector.jsx';
 import TransferControls from './TransferControls.jsx';
 import TransferPane from './TransferPane.jsx';
@@ -127,6 +128,7 @@ export default function UploadBox({ projects = [] }) {
   const [uploadingFiles, setUploadingFiles] = useState([]);
   const [uploadProjectId, setUploadProjectId] = useState(null);
   const [batchProjectId, setBatchProjectId] = useState(null);
+  const [assignmentNotice, setAssignmentNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const inputRef = useRef(null);
 
@@ -233,6 +235,13 @@ export default function UploadBox({ projects = [] }) {
   const projectById = useMemo(() => (
     new Map(projects.map((project) => [project.id, project]))
   ), [projects]);
+  const uploadProject = uploadProjectId ? projectById.get(uploadProjectId) ?? null : null;
+  const batchProject = batchProjectId ? projectById.get(batchProjectId) ?? null : null;
+  const quickUploadProjects = useMemo(() => (
+    [...projects]
+      .sort((a, b) => Number(b.documentCount ?? 0) - Number(a.documentCount ?? 0))
+      .slice(0, 3)
+  ), [projects]);
 
   const documentViews = useMemo(() => (
     documents.map((document) => {
@@ -247,6 +256,28 @@ export default function UploadBox({ projects = [] }) {
       };
     })
   ), [documents, embeddingDocumentIds, jobProgress, projectById]);
+
+  const projectSummary = useMemo(() => {
+    const countsByProjectId = new Map(projects.map((project) => [project.id, 0]));
+    let unassignedCount = 0;
+
+    documents.forEach((document) => {
+      if (document.projectId && countsByProjectId.has(document.projectId)) {
+        countsByProjectId.set(document.projectId, countsByProjectId.get(document.projectId) + 1);
+      } else {
+        unassignedCount += 1;
+      }
+    });
+
+    return {
+      totalCount: documents.length,
+      unassignedCount,
+      projectCounts: projects.map((project) => ({
+        ...project,
+        documentCount: countsByProjectId.get(project.id) ?? 0,
+      })),
+    };
+  }, [documents, projects]);
 
   useEffect(() => {
     const existingIds = new Set(documentViews.map((view) => view.document.id));
@@ -562,10 +593,18 @@ export default function UploadBox({ projects = [] }) {
       setDocuments((currentDocuments) => (
         currentDocuments.map((document) => updatedById.get(document.id) ?? document)
       ));
+      setLeftSelection(new Set());
+      setRightSelection(new Set());
+
+      const targetName = batchProject?.name ?? 'No project';
+      setAssignmentNotice(`Assigned to ${targetName}.`);
+      window.setTimeout(() => {
+        setAssignmentNotice('');
+      }, 1500);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to update selected projects.');
     }
-  }, [batchProjectId, selectedProjectAssignableIds]);
+  }, [batchProject, batchProjectId, selectedProjectAssignableIds]);
 
   const embedDocuments = useCallback(async (documentsToEmbed) => {
     const documentIds = documentsToEmbed.map((document) => document.id);
@@ -625,6 +664,29 @@ export default function UploadBox({ projects = [] }) {
   return (
     <div className="upload-stage">
       <div className="upload-workspace">
+        <div className="upload-preassign-strip" aria-label="Project for new uploads">
+          <span>Assign new uploads</span>
+          <div className="upload-preassign-options">
+            <button
+              className={!uploadProjectId ? 'is-active' : ''}
+              type="button"
+              onClick={() => setUploadProjectId(null)}
+            >
+              <ProjectChip label="No project" state="unassigned" variant="compact" />
+            </button>
+            {quickUploadProjects.map((project) => (
+              <button
+                className={uploadProjectId === project.id ? 'is-active' : ''}
+                type="button"
+                key={project.id}
+                onClick={() => setUploadProjectId(project.id)}
+              >
+                <ProjectChip project={project} variant="compact" />
+              </button>
+            ))}
+          </div>
+        </div>
+
         <FileDropZone
           inputRef={inputRef}
           isDragOver={isDragOver}
@@ -639,12 +701,48 @@ export default function UploadBox({ projects = [] }) {
         />
 
         <div className="upload-project-toolbar">
+          <span className="upload-project-toolbar__current">
+            New files:
+            <ProjectChip
+              project={uploadProject}
+              label={uploadProject?.name ?? 'No project'}
+              state={uploadProject ? 'project' : 'unassigned'}
+              variant="compact"
+            />
+          </span>
           <ProjectSelector
             projects={projects}
             value={uploadProjectId}
             label="New uploads"
             emptyLabel="No project"
             onChange={setUploadProjectId}
+          />
+        </div>
+
+        <div className="upload-project-summary" aria-label="Project document summary">
+          <span className="upload-project-summary__label">Projects</span>
+          <ProjectChip
+            label="All Documents"
+            documentCount={projectSummary.totalCount}
+            variant="compact"
+            showCount
+          />
+          {projectSummary.projectCounts.map((project) => (
+            <ProjectChip
+              key={project.id}
+              project={project}
+              documentCount={project.documentCount}
+              variant="compact"
+              showCount
+            />
+          ))}
+          <ProjectChip
+            label="No project"
+            documentCount={projectSummary.unassignedCount}
+            state="unassigned"
+            variant="compact"
+            showCount
+            className={projectSummary.unassignedCount > 0 ? 'has-unassigned-count' : ''}
           />
         </div>
 
@@ -711,18 +809,48 @@ export default function UploadBox({ projects = [] }) {
           />
         </section>
 
+        {assignmentNotice && (
+          <div className="upload-message is-success" role="status">
+            {assignmentNotice}
+          </div>
+        )}
+
         {selectedProjectAssignableIds.length > 0 && (
           <div className="project-assignment-bar">
-            <span>{selectedProjectAssignableIds.length} selected</span>
+            <div className="project-assignment-bar__summary">
+              <strong>
+                {selectedProjectAssignableIds.length} file{selectedProjectAssignableIds.length === 1 ? '' : 's'} selected
+              </strong>
+              <span>Assign to project</span>
+            </div>
+            <div className="project-assignment-bar__target">
+              <span>Assign to:</span>
+              <ProjectChip
+                project={batchProject}
+                label={batchProject?.name ?? 'No project'}
+                state={batchProject ? 'project' : 'unassigned'}
+                variant="compact"
+              />
+            </div>
             <ProjectSelector
               projects={projects}
               value={batchProjectId}
-              label="Set project"
+              label="Target"
               emptyLabel="No project"
               onChange={setBatchProjectId}
             />
             <button type="button" onClick={assignSelectedProject}>
               Apply
+            </button>
+            <button
+              className="project-assignment-bar__clear"
+              type="button"
+              onClick={() => {
+                setLeftSelection(new Set());
+                setRightSelection(new Set());
+              }}
+            >
+              Clear selection
             </button>
           </div>
         )}

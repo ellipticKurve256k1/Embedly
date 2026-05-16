@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { FileText, Award, CircleDot, Hash } from 'lucide-react';
-import ProjectSelector from './ProjectSelector.jsx';
+import ProjectChip from './ProjectChip.jsx';
 import './SearchResults.css';
 
 function formatScore(score) {
@@ -24,6 +24,7 @@ export default function SearchResults({
   onClosePreview,
 }) {
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const projectsById = new Map(projects.map((project) => [project.id, project]));
 
   // Auto-select first result when a new search returns
   useEffect(() => {
@@ -48,21 +49,17 @@ export default function SearchResults({
       <div className="result-list">
         <header className="result-list-header">
           <div className="result-list-title">
-            {results.length} result{results.length !== 1 ? 's' : ''}
+            <span>
+              {results.length} result{results.length !== 1 ? 's' : ''} from
+            </span>
+            {selectedProject ? (
+              <ProjectChip project={selectedProject} variant="compact" showCount />
+            ) : (
+              <ProjectChip label="All Documents" variant="compact" />
+            )}
           </div>
-          <ProjectSelector
-            projects={projects}
-            value={selectedProjectId}
-            label="Dataset"
-            emptyLabel="All Documents"
-            className="result-project-selector"
-            onChange={onProjectChange}
-          />
           <div className="result-list-query" title={query}>
             &ldquo;{query}&rdquo;
-          </div>
-          <div className="result-list-project">
-            {selectedProject ? selectedProject.name : 'All Documents'}
           </div>
         </header>
 
@@ -72,6 +69,9 @@ export default function SearchResults({
             const score = result.rerankScore ?? result.score ?? 0;
             const rank = index + 1;
             const rankClass = rank <= 3 ? ` rank-${rank}` : '';
+            const resultProject = result.projectId
+              ? projectsById.get(result.projectId) ?? { id: result.projectId, name: result.projectName }
+              : null;
 
             return (
               <button
@@ -94,8 +94,18 @@ export default function SearchResults({
 
                 <div className="result-item-body">
                   <div className="result-item-top">
-                    <span className="result-item-title">
-                      {result.documentName || 'Untitled document'}
+                    <span className="result-item-title-wrap">
+                      {!selectedProject && (
+                        <ProjectChip
+                          project={resultProject}
+                          label={resultProject?.name ?? 'No project'}
+                          state={resultProject ? 'project' : 'unassigned'}
+                          variant="micro"
+                        />
+                      )}
+                      <span className="result-item-title">
+                        {result.documentName || 'Untitled document'}
+                      </span>
                     </span>
                     <span className="result-item-score">
                       {formatScore(score)}
@@ -120,7 +130,7 @@ export default function SearchResults({
                     <span className="result-item-meta">
                       Chunk {result.chunkIndex != null ? result.chunkIndex + 1 : '—'}
                     </span>
-                    {result.projectName && (
+                    {!selectedProject && result.projectName && (
                       <span className="result-item-meta">{result.projectName}</span>
                     )}
                     {typeof result.rerankScore === 'number' && (
@@ -138,13 +148,13 @@ export default function SearchResults({
 
       {/* Right: Preview */}
       <div className="result-preview">
-        <ResultPreview result={selectedResult} onClose={onClosePreview} />
+        <ResultPreview result={selectedResult} projects={projects} onClose={onClosePreview} />
       </div>
     </div>
   );
 }
 
-function ResultPreview({ result, onClose }) {
+function ResultPreview({ result, projects, onClose }) {
   if (!result) {
     return (
       <div className="result-preview-empty">
@@ -155,6 +165,9 @@ function ResultPreview({ result, onClose }) {
   }
 
   const displayScore = result.rerankScore ?? result.score;
+  const resultProject = result.projectId
+    ? projects.find((project) => project.id === result.projectId) ?? { id: result.projectId, name: result.projectName }
+    : null;
 
   return (
     <div className="result-preview-content">
@@ -163,6 +176,12 @@ function ResultPreview({ result, onClose }) {
           <FileText size={20} />
           <strong>{result.documentName || 'Untitled document'}</strong>
         </div>
+        <ProjectChip
+          project={resultProject}
+          label={resultProject?.name ?? 'No project'}
+          state={resultProject ? 'project' : 'unassigned'}
+          variant="compact"
+        />
         <div className="result-preview-badge">
           <span>{typeof result.rerankScore === 'number' ? 'Rerank' : 'Similarity'}</span>
           <b>{formatScore(displayScore)}</b>
