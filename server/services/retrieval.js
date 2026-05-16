@@ -5,8 +5,20 @@ import {
   DEFAULT_EMBEDDING_MODEL,
   embedText,
 } from './embedder.js';
+import { isRerankerEnabled, rerankDocuments } from './reranker.js';
 
 export const DEFAULT_RETRIEVAL_LIMIT = 5;
+export const DEFAULT_CANDIDATE_LIMIT = 20;
+
+function normalizeLimit(value, fallback, { min = 1, max = 100 } = {}) {
+  const limit = Number(value);
+
+  if (!Number.isInteger(limit)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, limit));
+}
 
 export function toPublicChunk(row, score) {
   return {
@@ -43,6 +55,7 @@ export function toContextChunk(chunk) {
     nextChunk: chunk.nextChunk,
     content: chunk.content,
     score: chunk.score,
+    rerankScore: chunk.rerankScore,
     preview: chunk.content
       ? `${chunk.content.slice(0, 260)}${chunk.content.length > 260 ? '...' : ''}`
       : '',
@@ -85,6 +98,9 @@ function withAdjacentContext(chunk) {
 export async function retrieveChunks(query, {
   model = DEFAULT_EMBEDDING_MODEL,
   limit = DEFAULT_RETRIEVAL_LIMIT,
+  candidateLimit,
+  topK,
+  reranker = null,
 } = {}) {
   const trimmedQuery = String(query ?? '').trim();
 
@@ -92,6 +108,14 @@ export async function retrieveChunks(query, {
     throw new Error('Search query is required.');
   }
 
+  const finalLimit = normalizeLimit(topK ?? limit, DEFAULT_RETRIEVAL_LIMIT, { max: 50 });
+  const shouldRerank = isRerankerEnabled(reranker);
+  const finalCandidateLimit = shouldRerank
+    ? Math.max(
+      finalLimit,
+      normalizeLimit(candidateLimit, DEFAULT_CANDIDATE_LIMIT, { min: finalLimit, max: 100 }),
+    )
+    : finalLimit;
   const queryVector = Float32Array.from(await embedText(trimmedQuery, model));
   const rows = db.prepare(`
     SELECT
@@ -113,9 +137,16 @@ export async function retrieveChunks(query, {
     WHERE embeddings.model = ?
   `).all(model);
 
-  return rows
+  const candidates = rows
     .map((row) => toPublicChunk(row, cosineSimilarity(queryVector, blobToVector(row.vector))))
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+    .slice(0, finalCandidateLimit)
     .map(withAdjacentContext);
+
+  if (!shouldRerank) {
+    return candidates.slice(0, finalLimit);
+  }
+
+  const rerankedCandidates = await rerankDocuments(trimmedQuery, candidates, reranker);
+  return rerankedCandidates.slice(0, finalLimit);
 }

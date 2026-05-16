@@ -4,6 +4,7 @@ export const EMBEDDING_SETUP_STORAGE_KEY = 'embeddly.embeddingSetup';
 export const LLM_SETUP_STORAGE_KEY = 'embeddly.llmSetup';
 export const VECTOR_DB_SETUP_STORAGE_KEY = 'embeddly.vectorDbSetup';
 export const CHUNKING_CONFIG_STORAGE_KEY = 'embeddly.chunkingConfig';
+export const RERANKER_SETUP_STORAGE_KEY = 'embeddly.rerankerSetup';
 
 const API_BASE = 'http://localhost:3001/api';
 const LOCAL_STORAGE_KEYS = [
@@ -11,6 +12,7 @@ const LOCAL_STORAGE_KEYS = [
   LLM_SETUP_STORAGE_KEY,
   VECTOR_DB_SETUP_STORAGE_KEY,
   CHUNKING_CONFIG_STORAGE_KEY,
+  RERANKER_SETUP_STORAGE_KEY,
 ];
 
 const DEFAULT_VECTOR_DB_SETUP = {
@@ -29,11 +31,23 @@ export const DEFAULT_CHUNKING_CONFIG = {
   overlap: 320,
 };
 
+export const DEFAULT_RERANKER_SETUP = {
+  enabled: false,
+  model: 'Xenova/bge-reranker-v2-m3',
+  candidateLimit: 20,
+  topK: 5,
+};
+
 let cachedSettings = {};
 
 function coerceNumber(value, fallback) {
   const nextValue = Number(value);
   return Number.isFinite(nextValue) ? nextValue : fallback;
+}
+
+function coerceInteger(value, fallback) {
+  const nextValue = Number(value);
+  return Number.isInteger(nextValue) ? nextValue : fallback;
 }
 
 async function parseResponse(response) {
@@ -78,6 +92,7 @@ function getLocalSettingsForMigration() {
     llm: readLocalStorageSetup(LLM_SETUP_STORAGE_KEY),
     vectorDb: readLocalStorageSetup(VECTOR_DB_SETUP_STORAGE_KEY),
     chunking: readLocalStorageSetup(CHUNKING_CONFIG_STORAGE_KEY),
+    reranker: readLocalStorageSetup(RERANKER_SETUP_STORAGE_KEY),
   };
 }
 
@@ -89,6 +104,7 @@ function normalizeSettings(settings = {}) {
     llm: input.llm ?? null,
     vectorDb: input.vectorDb ?? null,
     chunking: input.chunking ?? null,
+    reranker: input.reranker ?? null,
   };
 }
 
@@ -143,6 +159,27 @@ export function normalizeChunkingConfig(config = {}) {
     maxChunkSize: Math.max(100, coerceNumber(input.maxChunkSize, maxTokens * 4)),
     minChunkSize: Math.max(1, coerceNumber(input.minChunkSize, minTokens * 4)),
     overlap: Math.max(0, coerceNumber(input.overlap, overlapTokens * 4)),
+  };
+}
+
+export function normalizeRerankerSetup(setup = {}) {
+  const input = setup && typeof setup === 'object' ? setup : {};
+  const topK = Math.max(
+    1,
+    Math.min(20, coerceInteger(input.topK, DEFAULT_RERANKER_SETUP.topK)),
+  );
+  const candidateLimit = Math.max(
+    topK,
+    Math.min(100, coerceInteger(input.candidateLimit, DEFAULT_RERANKER_SETUP.candidateLimit)),
+  );
+  const model = String(input.model ?? DEFAULT_RERANKER_SETUP.model).trim()
+    || DEFAULT_RERANKER_SETUP.model;
+
+  return {
+    enabled: input.enabled === true,
+    model,
+    candidateLimit,
+    topK,
   };
 }
 
@@ -202,6 +239,26 @@ export async function saveChunkingConfig(config) {
   return normalizeChunkingConfig(settings.chunking ?? normalizedConfig);
 }
 
+export async function saveRerankerSetup(setup) {
+  const normalizedSetup = normalizeRerankerSetup(setup);
+  const settings = await saveSettings({ reranker: normalizedSetup });
+  return normalizeRerankerSetup(settings.reranker ?? normalizedSetup);
+}
+
+export async function saveRetrievalSettings({ chunking, reranker }) {
+  const normalizedChunking = normalizeChunkingConfig(chunking);
+  const normalizedReranker = normalizeRerankerSetup(reranker);
+  const settings = await saveSettings({
+    chunking: normalizedChunking,
+    reranker: normalizedReranker,
+  });
+
+  return {
+    chunking: normalizeChunkingConfig(settings.chunking ?? normalizedChunking),
+    reranker: normalizeRerankerSetup(settings.reranker ?? normalizedReranker),
+  };
+}
+
 export function readSavedSetup(storageKey) {
   if (storageKey === EMBEDDING_SETUP_STORAGE_KEY) {
     return readSavedEmbeddingSetup();
@@ -217,6 +274,10 @@ export function readSavedSetup(storageKey) {
 
   if (storageKey === CHUNKING_CONFIG_STORAGE_KEY) {
     return readSavedChunkingConfig();
+  }
+
+  if (storageKey === RERANKER_SETUP_STORAGE_KEY) {
+    return readSavedRerankerSetup();
   }
 
   return null;
@@ -236,4 +297,8 @@ export function readSavedVectorDbSetup() {
 
 export function readSavedChunkingConfig() {
   return normalizeChunkingConfig(cachedSettings.chunking ?? DEFAULT_CHUNKING_CONFIG);
+}
+
+export function readSavedRerankerSetup() {
+  return normalizeRerankerSetup(cachedSettings.reranker ?? DEFAULT_RERANKER_SETUP);
 }

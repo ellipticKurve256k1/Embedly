@@ -7,6 +7,11 @@ function formatScore(score) {
   return `${Math.round(score * 100)}%`;
 }
 
+function formatDecimalScore(score) {
+  if (typeof score !== 'number') return '0.000';
+  return score.toFixed(3);
+}
+
 export default function SearchResults({
   query,
   results,
@@ -47,7 +52,7 @@ export default function SearchResults({
         <div className="result-list-items">
           {results.map((result, index) => {
             const isSelected = selectedResult?.chunkId === result.chunkId;
-            const score = result.score ?? 0;
+            const score = result.rerankScore ?? result.score ?? 0;
             const rank = index + 1;
             const rankClass = rank <= 3 ? ` rank-${rank}` : '';
 
@@ -94,9 +99,16 @@ export default function SearchResults({
                     />
                   </div>
 
-                  <span className="result-item-meta">
-                    Chunk {result.chunkIndex != null ? result.chunkIndex + 1 : '—'}
-                  </span>
+                  <div className="result-item-meta-row">
+                    <span className="result-item-meta">
+                      Chunk {result.chunkIndex != null ? result.chunkIndex + 1 : '—'}
+                    </span>
+                    {typeof result.rerankScore === 'number' && (
+                      <span className="result-item-rerank-meta">
+                        Embedding {formatDecimalScore(result.score)} · Rerank {formatDecimalScore(result.rerankScore)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
             );
@@ -122,6 +134,8 @@ function ResultPreview({ result, onClose }) {
     );
   }
 
+  const displayScore = result.rerankScore ?? result.score;
+
   return (
     <div className="result-preview-content">
       <div className="result-preview-head">
@@ -130,8 +144,8 @@ function ResultPreview({ result, onClose }) {
           <strong>{result.documentName || 'Untitled document'}</strong>
         </div>
         <div className="result-preview-badge">
-          <span>Similarity</span>
-          <b>{formatScore(result.score)}</b>
+          <span>{typeof result.rerankScore === 'number' ? 'Rerank' : 'Similarity'}</span>
+          <b>{formatScore(displayScore)}</b>
         </div>
       </div>
 
@@ -144,6 +158,12 @@ function ResultPreview({ result, onClose }) {
           <span>Chunk {result.chunkIndex != null ? result.chunkIndex + 1 : '—'}</span>
           <span className="tag-sep">·</span>
           <span>{result.content ? `${result.content.length} chars` : '0 chars'}</span>
+          {typeof result.rerankScore === 'number' && (
+            <>
+              <span className="tag-sep">·</span>
+              <span>Embedding {formatDecimalScore(result.score)}</span>
+            </>
+          )}
         </div>
       </div>
     </div>

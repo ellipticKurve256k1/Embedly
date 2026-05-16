@@ -115,6 +115,35 @@
   font-weight: 800;
 }
 
+.settings-subsection {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-subsection-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-subsection-heading h3,
+.settings-subsection-heading p {
+  margin: 0;
+}
+
+.settings-subsection-heading h3 {
+  color: #24304b;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.settings-subsection-heading p {
+  color: #6f7a94;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
 .model-options {
   display: grid;
   gap: 10px;

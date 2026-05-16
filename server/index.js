@@ -10,6 +10,7 @@ import jobsRouter from './routes/jobs.js';
 import searchRouter from './routes/search.js';
 import settingsRouter from './routes/settings.js';
 import uploadRouter from './routes/upload.js';
+import { initializeReranker } from './services/reranker.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const app = express();
@@ -41,3 +42,11 @@ app.use((error, _request, response, _next) => {
 app.listen(PORT, () => {
   console.log(`Express server running on http://localhost:${PORT}`);
 });
+
+if (process.env.PREWARM_RERANKER === 'true') {
+  initializeReranker()
+    .then(() => console.log('Reranker model preloaded'))
+    .catch((error) => {
+      console.warn('Failed to preload reranker:', error instanceof Error ? error.message : String(error));
+    });
+}

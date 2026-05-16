@@ -17,11 +17,12 @@ import {
   readSavedEmbeddingSetup,
   readSavedChunkingConfig,
   readSavedLlmSetup,
+  readSavedRerankerSetup,
   readSavedVectorDbSetup,
   loadSettings,
-  saveChunkingConfig,
   saveEmbeddingSetup,
   saveLlmSetup,
+  saveRetrievalSettings,
   saveVectorDbSetup,
 } from '../lib/storage.js';
 import LoginButton from './LoginButton';
@@ -138,6 +139,7 @@ export default function SettingsPage() {
     vectorDbSetup?.provider ?? vectorDbProviders[0].id,
   );
   const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
+  const [rerankerConfig, setRerankerConfig] = useState(readSavedRerankerSetup);
   const [advancedOptionsEnabled, setAdvancedOptionsEnabled] = useState(true);
   const [savingSection, setSavingSection] = useState(null);
   const [saveStatus, setSaveStatus] = useState({ section: null, type: null, message: '' });
@@ -155,6 +157,7 @@ export default function SettingsPage() {
     const nextLlmSetup = readSavedLlmSetup();
     const nextVectorDbSetup = readSavedVectorDbSetup();
     const nextChunkingConfig = readSavedChunkingConfig();
+    const nextRerankerConfig = readSavedRerankerSetup();
 
     setEmbeddingSetup(nextEmbeddingSetup);
     setSelectedProvider(nextEmbeddingSetup?.provider ?? embeddingProviders[0].id);
@@ -175,6 +178,7 @@ export default function SettingsPage() {
     setVectorDbSetup(nextVectorDbSetup);
     setSelectedVectorDbProvider(nextVectorDbSetup?.provider ?? vectorDbProviders[0].id);
     setChunkingConfig(nextChunkingConfig);
+    setRerankerConfig(nextRerankerConfig);
   }, []);
 
   useEffect(() => {
@@ -299,14 +303,15 @@ export default function SettingsPage() {
   };
 
   const handleSaveChunkingConfig = async () => {
-    const savedConfig = await saveWithStatus(
+    const savedSettings = await saveWithStatus(
       'retrieval',
-      () => saveChunkingConfig(chunkingConfig),
+      () => saveRetrievalSettings({ chunking: chunkingConfig, reranker: rerankerConfig }),
       'Retrieval settings saved.',
     );
 
-    if (savedConfig) {
-      setChunkingConfig(savedConfig);
+    if (savedSettings) {
+      setChunkingConfig(savedSettings.chunking);
+      setRerankerConfig(savedSettings.reranker);
     }
   };
 
@@ -398,9 +403,11 @@ export default function SettingsPage() {
             {activeSection === 'retrieval' && (
               <RetrievalSettingsPanel
                 chunkingConfig={chunkingConfig}
+                rerankerConfig={rerankerConfig}
                 isSaving={savingSection === 'retrieval'}
                 saveStatus={getSaveStatus('retrieval', saveStatus)}
                 onChange={setChunkingConfig}
+                onRerankerChange={setRerankerConfig}
                 onSave={handleSaveChunkingConfig}
               />
             )}
@@ -427,7 +434,15 @@ export default function SettingsPage() {
   );
 }
 
-function RetrievalSettingsPanel({ chunkingConfig, isSaving, saveStatus, onChange, onSave }) {
+function RetrievalSettingsPanel({
+  chunkingConfig,
+  rerankerConfig,
+  isSaving,
+  saveStatus,
+  onChange,
+  onRerankerChange,
+  onSave,
+}) {
   const updateConfig = (field, value) => {
     onChange((currentConfig) => ({
       ...currentConfig,
@@ -435,12 +450,37 @@ function RetrievalSettingsPanel({ chunkingConfig, isSaving, saveStatus, onChange
     }));
   };
 
+  const updateRerankerConfig = (field, value) => {
+    onRerankerChange((currentConfig) => {
+      const nextConfig = {
+        ...currentConfig,
+        [field]: value,
+      };
+
+      if (field === 'topK' && Number(value) > Number(nextConfig.candidateLimit)) {
+        nextConfig.candidateLimit = Number(value);
+      }
+
+      if (field === 'candidateLimit' && Number(value) < Number(nextConfig.topK)) {
+        nextConfig.topK = Number(value);
+      }
+
+      return nextConfig;
+    });
+  };
+
   return (
     <section className="settings-detail" aria-labelledby="retrieval-title">
       <div className="settings-detail-heading">
         <h2 id="retrieval-title">Retrieval</h2>
-        <p>Configure how uploaded documents are split before embedding and indexing.</p>
+        <p>Configure chunking and optional reranking for higher precision retrieval.</p>
       </div>
+
+      <div className="settings-subsection">
+        <div className="settings-subsection-heading">
+          <h3>Chunking</h3>
+          <p>Control how uploaded documents are split before embedding and indexing.</p>
+        </div>
 
       <div className="settings-field-grid">
         <label className="settings-field">
@@ -555,6 +595,80 @@ function RetrievalSettingsPanel({ chunkingConfig, isSaving, saveStatus, onChange
               : `${chunkingConfig.overlapTokens} tokens`}
           </em>
         </label>
+      </div>
+      </div>
+
+      <div className="settings-subsection">
+        <div className="settings-subsection-heading">
+          <h3>Reranking</h3>
+          <p>Use a local cross-encoder as a second pass over retrieved candidates.</p>
+        </div>
+
+        <div className="setup-message">
+          <Search size={18} />
+          <span>
+            Optional precision boost
+            <small>
+              When enabled, Embeddly retrieves more candidates, reranks them locally, then returns
+              the strongest matches. The first enabled query may download the reranker model.
+            </small>
+          </span>
+        </div>
+
+        <AdvancedOption
+          enabled={rerankerConfig.enabled}
+          label="Enable reranking"
+          summary="Run a local Transformers.js cross-encoder after embedding retrieval."
+          onChange={(enabled) => updateRerankerConfig('enabled', enabled)}
+        />
+
+        {rerankerConfig.enabled && (
+          <div className="settings-field-grid">
+            <label className="settings-field">
+              <span>
+                <strong>Reranker model</strong>
+                <small>Choose the local cross-encoder used to score query and chunk pairs.</small>
+              </span>
+              <select
+                value={rerankerConfig.model}
+                onChange={(event) => updateRerankerConfig('model', event.target.value)}
+              >
+                <option value="Xenova/bge-reranker-v2-m3">BGE Reranker v2 M3</option>
+                <option value="Xenova/bge-reranker-base">BGE Reranker Base</option>
+              </select>
+            </label>
+
+            <label className="settings-field">
+              <span>
+                <strong>Candidates to retrieve</strong>
+                <small>Embedding-stage candidates sent into the reranker.</small>
+              </span>
+              <input
+                min={Math.max(5, rerankerConfig.topK)}
+                max="100"
+                step="1"
+                type="number"
+                value={rerankerConfig.candidateLimit}
+                onChange={(event) => updateRerankerConfig('candidateLimit', Number(event.target.value))}
+              />
+            </label>
+
+            <label className="settings-field">
+              <span>
+                <strong>Top results to return</strong>
+                <small>Final chunks returned to chat and search after reranking.</small>
+              </span>
+              <input
+                min="1"
+                max="20"
+                step="1"
+                type="number"
+                value={rerankerConfig.topK}
+                onChange={(event) => updateRerankerConfig('topK', Number(event.target.value))}
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       <SaveSettingsButton

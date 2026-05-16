@@ -6,6 +6,11 @@ function formatScore(score) {
   return `${Math.round(score * 100)}%`;
 }
 
+function formatDecimalScore(score) {
+  if (typeof score !== 'number') return '0.000';
+  return score.toFixed(3);
+}
+
 export default function SourcesPanel({
   isOpen,
   chunks,
@@ -71,10 +76,16 @@ export default function SourcesPanel({
                   <div className="sources-panel__chunk-top">
                     <FileText size={16} />
                     <strong>{chunk.documentName || 'Untitled document'}</strong>
-                    <span>{formatScore(chunk.score)}</span>
+                    <span>{formatScore(chunk.rerankScore ?? chunk.score)}</span>
                   </div>
                   {citedSet.has(index) && (
                     <small className="sources-panel__cited-label">Cited in answer</small>
+                  )}
+                  {typeof chunk.rerankScore === 'number' && (
+                    <div className="sources-panel__scores" aria-label="Retrieval scores">
+                      <span>Embedding {formatDecimalScore(chunk.score)}</span>
+                      <span>Rerank {formatDecimalScore(chunk.rerankScore)}</span>
+                    </div>
                   )}
                   <p>
                     {chunk.preview || chunk.content

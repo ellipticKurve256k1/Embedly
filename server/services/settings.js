@@ -8,12 +8,14 @@ import {
   getUserSettingRow,
   setUserSettingRow,
 } from '../db/credentials.js';
+import { DEFAULT_RERANKER_CONFIG } from './reranker.js';
 
 export const SETTINGS_KEYS = {
   llm: 'llm.setup',
   embedding: 'embedding.setup',
   chunking: 'chunking.config',
   vectorDb: 'vector_db.setup',
+  reranker: 'reranker.setup',
 };
 
 const PUBLIC_SETTING_KEYS = new Map(
@@ -161,9 +163,42 @@ function normalizeLlmSetup(value, userId) {
   return setup;
 }
 
+function normalizeNumber(value, fallback, { min, max }) {
+  const nextValue = Number(value);
+
+  if (!Number.isInteger(nextValue)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, nextValue));
+}
+
+function normalizeRerankerSetup(value) {
+  const input = value && typeof value === 'object' ? value : {};
+  const topK = normalizeNumber(input.topK, DEFAULT_RERANKER_CONFIG.topK, { min: 1, max: 20 });
+  const candidateLimit = normalizeNumber(
+    input.candidateLimit,
+    DEFAULT_RERANKER_CONFIG.candidateLimit,
+    { min: topK, max: 100 },
+  );
+  const model = String(input.model ?? DEFAULT_RERANKER_CONFIG.model).trim()
+    || DEFAULT_RERANKER_CONFIG.model;
+
+  return {
+    enabled: input.enabled === true,
+    model,
+    candidateLimit,
+    topK,
+  };
+}
+
 function normalizeSetting(publicKey, value, userId) {
   if (publicKey === 'llm') {
     return normalizeLlmSetup(value, userId);
+  }
+
+  if (publicKey === 'reranker') {
+    return normalizeRerankerSetup(value);
   }
 
   return value;
@@ -295,4 +330,9 @@ export function getEmbeddingSetup(userId) {
 
 export function getChunkingConfig(userId) {
   return getSetting(SETTINGS_KEYS.chunking, userId);
+}
+
+export function getRerankerSetup(userId) {
+  const setting = getSetting(SETTINGS_KEYS.reranker, userId);
+  return setting ? normalizeRerankerSetup(setting) : null;
 }

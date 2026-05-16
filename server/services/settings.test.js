@@ -7,6 +7,7 @@ import {
   deleteSetting,
   getAllPublicSettings,
   getPublicSetting,
+  getRerankerSetup,
   getSetting,
   isMaskedApiKey,
   maskApiKey,
@@ -70,6 +71,25 @@ test('savePublicSettings persists public embedding setting', () => {
   const result = savePublicSettings({ embedding: { provider: 'ollama', model: 'nomic' } });
   assert.equal(result.embedding.model, 'nomic');
   assert.equal(getPublicSetting('embedding').model, 'nomic');
+});
+
+test('savePublicSettings persists normalized reranker settings', () => {
+  const result = savePublicSettings({
+    reranker: {
+      enabled: true,
+      model: ' ',
+      candidateLimit: 2,
+      topK: 30,
+    },
+  });
+
+  assert.deepEqual(result.reranker, {
+    enabled: true,
+    model: 'Xenova/bge-reranker-v2-m3',
+    candidateLimit: 20,
+    topK: 20,
+  });
+  assert.deepEqual(getRerankerSetup(), result.reranker);
 });
 
 test('savePublicSettings masks public API keys', () => {

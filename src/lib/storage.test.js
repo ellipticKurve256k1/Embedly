@@ -3,15 +3,19 @@ import test, { afterEach, beforeEach } from 'node:test';
 import {
   CHUNKING_CONFIG_STORAGE_KEY,
   DEFAULT_CHUNKING_CONFIG,
+  DEFAULT_RERANKER_SETUP,
   EMBEDDING_SETUP_STORAGE_KEY,
   initializeSettings,
   loadSettings,
   normalizeChunkingConfig,
+  normalizeRerankerSetup,
   readSavedChunkingConfig,
   readSavedEmbeddingSetup,
+  readSavedRerankerSetup,
   readSavedVectorDbSetup,
   saveChunkingConfig,
   saveEmbeddingSetup,
+  saveRetrievalSettings,
   saveSettings,
 } from './storage.js';
 
@@ -72,6 +76,24 @@ test('normalizeChunkingConfig clamps invalid strategy and numbers', () => {
   assert.equal(result.minTokens, 100);
 });
 
+test('normalizeRerankerSetup returns safe defaults and bounded limits', () => {
+  assert.deepEqual(normalizeRerankerSetup({}), DEFAULT_RERANKER_SETUP);
+
+  const result = normalizeRerankerSetup({
+    enabled: true,
+    model: ' ',
+    candidateLimit: 2,
+    topK: 40,
+  });
+
+  assert.deepEqual(result, {
+    enabled: true,
+    model: DEFAULT_RERANKER_SETUP.model,
+    candidateLimit: 20,
+    topK: 20,
+  });
+});
+
 test('readSavedVectorDbSetup returns default when unset', () => {
   assert.deepEqual(readSavedVectorDbSetup(), { provider: 'sqlite', name: 'SQLite' });
 });
@@ -112,6 +134,32 @@ test('saveChunkingConfig normalizes before save', async () => {
   const result = await saveChunkingConfig({ strategy: 'fixed', maxTokens: 20 });
   assert.equal(result.strategy, 'fixed');
   assert.equal(result.maxTokens, 100);
+});
+
+test('saveRetrievalSettings saves chunking and reranker together', async () => {
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    assert.equal(body.chunking.strategy, 'recursive');
+    assert.equal(body.reranker.enabled, true);
+    return jsonResponse(body);
+  };
+
+  const result = await saveRetrievalSettings({
+    chunking: { strategy: 'bad' },
+    reranker: { enabled: true, candidateLimit: 12, topK: 7 },
+  });
+
+  assert.equal(result.chunking.strategy, 'recursive');
+  assert.deepEqual(result.reranker, {
+    enabled: true,
+    model: DEFAULT_RERANKER_SETUP.model,
+    candidateLimit: 12,
+    topK: 7,
+  });
+});
+
+test('readSavedRerankerSetup returns normalized default', () => {
+  assert.deepEqual(readSavedRerankerSetup(), DEFAULT_RERANKER_SETUP);
 });
 
 test('readSavedChunkingConfig returns normalized default', () => {

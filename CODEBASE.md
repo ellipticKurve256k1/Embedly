@@ -17,6 +17,7 @@ Embeddly is a local-first RAG knowledge search system. Users upload private docu
 | File upload | `multer` |
 | Document parsing | Local parser service with PDF, CSV, text, and Markdown support |
 | Embedding provider | Ollama embeddings API |
+| Optional reranker | Transformers.js local cross-encoder |
 | LLM provider | Ollama chat API or OpenAI-compatible `/v1/chat/completions` |
 | Icons | `lucide-react` |
 | Auth | LNURL-Auth with Lightning wallets |
@@ -152,6 +153,7 @@ Settings keys:
 | `embedding.setup` | `embedding` | No |
 | `chunking.config` | `chunking` | No |
 | `vector_db.setup` | `vectorDb` | No |
+| `reranker.setup` | `reranker` | No |
 
 ## 7. API Endpoints
 
@@ -201,7 +203,8 @@ User submits query
   -> frontend reads cached embedding model
   -> GET /api/search?q=...
   -> retrieval embeds query
-  -> vectors are compared in memory
+  -> vectors are compared in memory for candidate recall
+  -> optional local reranker reorders candidates when enabled
   -> ranked chunks return to SearchResults
 ```
 
@@ -214,7 +217,7 @@ User sends message
   -> POST /api/chat
   -> server resolves saved or request-provided LLM settings
   -> server uses its hot cache or rehydrates it from request history
-  -> retrieval finds context chunks
+  -> retrieval finds context chunks, optionally reranked by local cross-encoder
   -> follow-up queries may be rewritten with recent conversation
   -> messages are built with source instructions
   -> LLM response streams as SSE tokens
@@ -284,7 +287,8 @@ User clicks Connect Wallet
 | Parser | `server/services/parser.js` | Extract text from PDF, CSV, text, and Markdown uploads. |
 | Chunker | `server/services/chunker.js` | Split text into recursive, paragraph, or fixed chunks. |
 | Embedder | `server/services/embedder.js` | Generate embedding vectors through Ollama. |
-| Retrieval | `server/services/retrieval.js` | Embed queries and rank stored vectors by similarity. |
+| Retrieval | `server/services/retrieval.js` | Embed queries, retrieve candidates by vector similarity, and optionally return reranked chunks. |
+| Reranker | `server/services/reranker.js` | Lazy-load a local Transformers.js cross-encoder and score query/chunk pairs. |
 | LLM | `server/services/llm.js` | Build prompts, rewrite follow-up queries, stream chat responses. |
 | Settings | `server/services/settings.js` | Persist settings, encrypt API keys, mask public responses. |
 | Auth | `server/services/auth.js` | Generate LNURL challenges, verify wallet signatures, issue and validate JWT sessions. |
@@ -343,5 +347,7 @@ Test files live next to the source they cover, such as `server/services/chunker.
 | `OLLAMA_REWRITE_TIMEOUT_MS` | `3000` | Query rewrite timeout. |
 | `EXTERNAL_API_CHAT_TIMEOUT_MS` | `60000` | External API chat timeout. |
 | `EMBEDDLY_ENCRYPTION_KEY` | file-backed key | Optional server-side key material for settings encryption. |
+| `TRANSFORMERS_CACHE` | `server/.models` | Optional cache directory for local reranker model downloads. |
+| `PREWARM_RERANKER` | unset | Set to `true` to load the reranker model when the server starts. |
 
 No `.env` file is required for basic local development. User-facing model, retrieval, generation, and vector database settings are configurable through the Settings page and stored in SQLite.

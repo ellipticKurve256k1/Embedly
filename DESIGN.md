@@ -26,6 +26,8 @@ The topbar carries the logo, mode switching, configured model status, wallet log
 
 Chat and search modes show a setup-required glass notice instead of their primary controls when required providers are missing. The notice lists missing settings and links directly to Settings, while upload stays available.
 
+Retrieval settings include optional reranking controls. When enabled, users can choose the local cross-encoder model, candidate count, and final result count from the same Retrieval settings surface.
+
 ## 2. Color Palette
 
 | Role | Value | Usage |
@@ -250,6 +252,7 @@ Visual rules:
 Visual rules:
 
 - Result cards show document name, chunk preview, and relevance score.
+- Reranked chat sources show both embedding and rerank scores so users can tell when the second stage affected ordering.
 - Selected result state should be obvious without overpowering the map.
 - The ontology map represents chunks or documents as circular nodes connected by relationship lines.
 - Hover and focus states should expose interactivity while preserving map readability.

@@ -232,12 +232,26 @@
 }
 
 /* Meta */
-.result-item-meta {
+.result-item-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.result-item-meta,
+.result-item-rerank-meta {
   font-size: 12px;
   font-weight: 600;
   color: #a5afc8;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.result-item-rerank-meta {
+  color: #6258ff;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* ========================================

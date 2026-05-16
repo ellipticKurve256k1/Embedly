@@ -263,6 +263,24 @@
   background: rgba(39, 116, 91, 0.1);
 }
 
+.sources-panel__scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.sources-panel__scores span {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #6258ff;
+  background: rgba(107, 92, 255, 0.09);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .sources-panel__chunk small {
   color: #9aa5bf;
   font-size: 11px;

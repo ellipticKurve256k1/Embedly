@@ -60,15 +60,15 @@ test('buildContextBlock handles empty input', () => {
 });
 
 test('buildContextBlock limits number of chunks', () => {
-  const block = buildContextBlock(Array.from({ length: 8 }, (_, index) => ({
+  const block = buildContextBlock(Array.from({ length: 12 }, (_, index) => ({
     documentName: `doc-${index}.txt`,
     chunkIndex: index,
     score: 0.5,
     content: `content ${index}`,
   })));
 
-  assert.match(block, /Source 5/);
-  assert.doesNotMatch(block, /Source 6/);
+  assert.match(block, /Source 10/);
+  assert.doesNotMatch(block, /Source 11/);
 });
 
 test('buildChatMessages includes system message and user message', () => {

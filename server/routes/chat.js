@@ -7,12 +7,19 @@ import {
   rewriteRetrievalQuery,
   streamChat,
 } from '../services/llm.js';
+import { isRerankerEnabled } from '../services/reranker.js';
 import { retrieveChunks, toContextChunk } from '../services/retrieval.js';
-import { getEmbeddingSetup, getLlmSetup, isMaskedApiKey } from '../services/settings.js';
+import {
+  getEmbeddingSetup,
+  getLlmSetup,
+  getRerankerSetup,
+  isMaskedApiKey,
+} from '../services/settings.js';
 
 const router = express.Router();
 const conversations = new Map();
 const MAX_HISTORY_MESSAGES = 6;
+const CHAT_CANDIDATE_LIMIT = 20;
 const CHAT_RETRIEVAL_LIMIT = 5;
 
 function writeSse(response, event, data) {
@@ -68,7 +75,8 @@ function saveConversationTurn(conversationId, message, assistantContent) {
 
 function computeAverageScore(chunkList) {
   if (chunkList.length === 0) return 0;
-  return chunkList.reduce((sum, chunk) => sum + chunk.score, 0) / chunkList.length;
+  return chunkList.reduce((sum, chunk) => sum + (chunk.rerankScore ?? chunk.score ?? 0), 0)
+    / chunkList.length;
 }
 
 function selectBetterChunks(originalChunks, rewrittenChunks) {
@@ -79,6 +87,35 @@ function selectBetterChunks(originalChunks, rewrittenChunks) {
   const rewrittenScore = computeAverageScore(rewrittenChunks);
 
   return rewrittenScore > originalScore ? rewrittenChunks : originalChunks;
+}
+
+function buildContextEvent({
+  message,
+  retrievalQuery,
+  rewriteUsed,
+  chunks,
+  rerankerSetup,
+  candidateLimit,
+  topK,
+  error,
+}) {
+  const rerankerEnabled = isRerankerEnabled(rerankerSetup);
+  const rerankerUsed = rerankerEnabled
+    && chunks.some((chunk) => typeof chunk.rerankScore === 'number');
+
+  return {
+    originalQuery: message,
+    rewrittenQuery: retrievalQuery,
+    wasRewritten: rewriteUsed,
+    chunks: chunks.map(toContextChunk),
+    citedIndices: [],
+    ...(error ? { error } : {}),
+    rerankerUsed,
+    rerankerModel: rerankerUsed ? rerankerSetup.model : null,
+    rerankerEnabled,
+    candidateLimit,
+    topK,
+  };
 }
 
 router.post('/', async (request, response) => {
@@ -107,6 +144,15 @@ router.post('/', async (request, response) => {
     ? rawConversationId.trim()
     : uuidv4();
   const bodyHistory = sanitizeHistory(request.body?.history);
+  const rerankerSetup = getRerankerSetup(request.userId) ?? {};
+  const candidateLimit = rerankerSetup.candidateLimit ?? CHAT_CANDIDATE_LIMIT;
+  const topK = rerankerSetup.topK ?? CHAT_RETRIEVAL_LIMIT;
+  const retrievalOptions = {
+    model: embeddingModel,
+    candidateLimit,
+    topK,
+    reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
+  };
 
   response.setHeader('Content-Type', 'text/event-stream');
   response.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -153,8 +199,7 @@ router.post('/', async (request, response) => {
       try {
         // Run retrieval with ORIGINAL query AND rewrite in parallel
         const originalRetrieval = retrieveChunks(message, {
-          model: embeddingModel,
-          limit: CHAT_RETRIEVAL_LIMIT,
+          ...retrievalOptions,
         });
         const rewritePromise = rewriteRetrievalQuery({
           ...llmConfig,
@@ -191,8 +236,7 @@ router.post('/', async (request, response) => {
         // If rewrite produced different query, re-retrieve and select best chunks
         if (validRewrittenQuery !== message) {
           const rewrittenChunks = await retrieveChunks(validRewrittenQuery, {
-            model: embeddingModel,
-            limit: CHAT_RETRIEVAL_LIMIT,
+            ...retrievalOptions,
           });
           chunks = selectBetterChunks(originalChunks, rewrittenChunks);
           retrievalQuery = validRewrittenQuery;
@@ -216,18 +260,19 @@ router.post('/', async (request, response) => {
       const retrievalStartedAt = performance.now();
       try {
         chunks = await retrieveChunks(message, {
-          model: embeddingModel,
-          limit: CHAT_RETRIEVAL_LIMIT,
+          ...retrievalOptions,
         });
       } catch (error) {
-        writeSse(response, 'context', {
-          originalQuery: message,
-          rewrittenQuery: message,
-          wasRewritten: false,
+        writeSse(response, 'context', buildContextEvent({
+          message,
+          retrievalQuery: message,
+          rewriteUsed: false,
           chunks: [],
-          citedIndices: [],
+          rerankerSetup,
+          candidateLimit,
+          topK,
           error: error instanceof Error ? error.message : 'Context retrieval failed.',
-        });
+        }));
         response.end();
         return;
       } finally {
@@ -237,21 +282,25 @@ router.post('/', async (request, response) => {
 
     // Send context event (for non-first-message cases, we already have chunks)
     if (history.length === 0) {
-      writeSse(response, 'context', {
-        originalQuery: message,
-        rewrittenQuery: retrievalQuery,
-        wasRewritten: false,
-        chunks: chunks.map(toContextChunk),
-        citedIndices: [],
-      });
+      writeSse(response, 'context', buildContextEvent({
+        message,
+        retrievalQuery,
+        rewriteUsed: false,
+        chunks,
+        rerankerSetup,
+        candidateLimit,
+        topK,
+      }));
     } else {
-      writeSse(response, 'context', {
-        originalQuery: message,
-        rewrittenQuery: retrievalQuery,
-        wasRewritten: rewriteUsed,
-        chunks: chunks.map(toContextChunk),
-        citedIndices: [],
-      });
+      writeSse(response, 'context', buildContextEvent({
+        message,
+        retrievalQuery,
+        rewriteUsed,
+        chunks,
+        rerankerSetup,
+        candidateLimit,
+        topK,
+      }));
     }
 
     const messages = buildChatMessages({ message, history, chunks });
@@ -279,6 +328,7 @@ router.post('/', async (request, response) => {
       provider,
       model,
       chunkCount: chunks.length,
+      rerankerUsed: chunks.some((chunk) => typeof chunk.rerankScore === 'number'),
       historyMessages: history.length,
       rewriteUsed,
       rewriteFailed,
