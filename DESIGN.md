@@ -24,6 +24,8 @@ Main layouts:
 
 The topbar carries the logo, mode switching, configured model status, wallet login control, and settings button. Content surfaces keep a constrained inner rhythm while the outer shell supplies depth and separation.
 
+Chat and search modes show a setup-required glass notice instead of their primary controls when required providers are missing. The notice lists missing settings and links directly to Settings, while upload stays available.
+
 ## 2. Color Palette
 
 | Role | Value | Usage |

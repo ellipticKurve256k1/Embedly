@@ -18,6 +18,28 @@ import ModelStatusBar from './components/ModelStatusBar';
 import SearchResults from './components/SearchResults';
 import ChatPanel from './components/ChatPanel';
 import LoginButton from './components/LoginButton';
+import SetupRequiredNotice from './components/SetupRequiredNotice';
+
+function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
+  const missingSettings = [];
+
+  if (!embeddingSetup?.model) {
+    missingSettings.push('Embedding model');
+  }
+
+  if (!llmSetup?.model) {
+    missingSettings.push('LLM');
+  }
+
+  if (!(vectorDbSetup?.provider || vectorDbSetup?.name)) {
+    missingSettings.push('VectorDB');
+  }
+
+  return {
+    settingsReady: missingSettings.length === 0,
+    requiredSettingsMissing: missingSettings,
+  };
+}
 
 export default function App() {
   const [page, setPage] = useState(() => (
@@ -90,7 +112,20 @@ export default function App() {
     };
   }, [refreshConfiguredSettings]);
 
+  const { settingsReady, requiredSettingsMissing } = computeSettingsStatus({
+    embeddingSetup,
+    llmSetup,
+    vectorDbSetup,
+  });
+  const guardedModes = settingsReady ? [] : ['chat', 'search'];
+
+  const handleNavigateToSettings = useCallback(() => {
+    window.location.hash = '#settings';
+  }, []);
+
   const handleSearch = useCallback(async (queryText) => {
+    if (!settingsReady) return;
+
     const trimmedQuery = queryText.trim();
     if (!trimmedQuery) return;
 
@@ -107,7 +142,7 @@ export default function App() {
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [settingsReady]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -162,7 +197,12 @@ export default function App() {
       <section className="landing-shell" aria-label="Embeddly">
         <header className="topbar">
           <img className="brand-logo" src={logoSrc} alt="Embeddly" />
-          <ModeTabs activeMode={mode} onModeChange={setMode} />
+          <ModeTabs
+            activeMode={mode}
+            disabledModes={guardedModes}
+            onModeChange={setMode}
+            onNavigateToSettings={handleNavigateToSettings}
+          />
           <div className="topbar-actions">
             <ModelStatusBar
               embeddingSetup={embeddingSetup}
@@ -176,56 +216,70 @@ export default function App() {
           </div>
         </header>
 
-        {mode === 'chat' && <ChatPanel />}
+        {mode === 'chat' && (
+          <ChatPanel
+            settingsReady={settingsReady}
+            missingSettings={requiredSettingsMissing}
+          />
+        )}
 
         {mode === 'search' && (
           <div className={`search-stage${hasResults ? ' has-results' : ''}`}>
-            {!hasResults && (
-              <div className="orbital-field" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            )}
-
-            <label className="search-box">
-              <Search size={20} />
-              <input
-                type="search"
-                placeholder="Search your knowledge base..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isSearching}
+            {!settingsReady ? (
+              <SetupRequiredNotice
+                feature="search"
+                missingSettings={requiredSettingsMissing}
               />
-              {isSearching && (
-                <LoaderCircle size={20} className="search-spinner" />
-              )}
-            </label>
+            ) : (
+              <>
+                {!hasResults && (
+                  <div className="orbital-field" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                )}
 
-            {searchError && (
-              <div className="search-error" role="alert">
-                {searchError}
-              </div>
-            )}
+                <label className="search-box">
+                  <Search size={20} />
+                  <input
+                    type="search"
+                    placeholder="Search your knowledge base..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isSearching}
+                  />
+                  {isSearching && (
+                    <LoaderCircle size={20} className="search-spinner" />
+                  )}
+                </label>
 
-            {hasResults && (
-              <SearchResults
-                query={query}
-                results={searchResults}
-                selectedResult={selectedResult}
-                onSelectResult={handleSelectResult}
-                onClosePreview={handleClosePanel}
-              />
-            )}
+                {searchError && (
+                  <div className="search-error" role="alert">
+                    {searchError}
+                  </div>
+                )}
 
-            {searchResults && searchResults.length === 0 && !isSearching && (
-              <div className="search-empty">
-                <p>No matching results found.</p>
-                <button type="button" onClick={handleClearSearch}>
-                  Clear search
-                </button>
-              </div>
+                {hasResults && (
+                  <SearchResults
+                    query={query}
+                    results={searchResults}
+                    selectedResult={selectedResult}
+                    onSelectResult={handleSelectResult}
+                    onClosePreview={handleClosePanel}
+                  />
+                )}
+
+                {searchResults && searchResults.length === 0 && !isSearching && (
+                  <div className="search-empty">
+                    <p>No matching results found.</p>
+                    <button type="button" onClick={handleClearSearch}>
+                      Clear search
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

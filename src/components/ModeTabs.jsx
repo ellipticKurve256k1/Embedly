@@ -7,17 +7,32 @@ const tabs = [
   { key: 'upload', label: 'Upload', icon: Upload },
 ];
 
-export default function ModeTabs({ activeMode, onModeChange }) {
+export default function ModeTabs({
+  activeMode,
+  disabledModes = [],
+  onModeChange,
+  onNavigateToSettings,
+}) {
   return (
     <nav className="mode-tabs" aria-label="Main modes">
       {tabs.map(({ key, label, icon: Icon }) => {
         const isActive = activeMode === key;
+        const isDisabled = disabledModes.includes(key);
         return (
           <button
             key={key}
-            className={`mode-tab${isActive ? ' is-active' : ''}`}
+            className={`mode-tab${isActive ? ' is-active' : ''}${isDisabled ? ' is-disabled' : ''}`}
             aria-pressed={isActive}
-            onClick={() => onModeChange(key)}
+            aria-disabled={isDisabled}
+            title={isDisabled ? 'Finish setup in Settings' : undefined}
+            onClick={() => {
+              if (isDisabled) {
+                onNavigateToSettings?.();
+                return;
+              }
+
+              onModeChange(key);
+            }}
           >
             <Icon size={18} />
             <span>{label}</span>

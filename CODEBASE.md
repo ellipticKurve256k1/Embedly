@@ -62,7 +62,7 @@ Generated or local runtime data:
 
 - `src/main.jsx` mounts `<App />` into `#root`.
 - `src/App.jsx` uses hash routing: `#/` for the main app and `#settings` for settings.
-- Mode switching is local React state: chat, upload, and search.
+- Mode switching is local React state: chat, upload, and search. Chat and search are guarded in the UI until embedding, generation, and vector DB settings are available; upload remains accessible.
 - `src/lib/api.js` wraps backend calls and SSE parsing.
 - `src/lib/storage.js` loads settings from `/api/settings`, caches them in memory, migrates old Embeddly localStorage settings, and exposes synchronous read helpers.
 - `src/lib/auth.js` stores the LNURL-Auth session token in localStorage, injects `Authorization` headers, and emits auth-change events.

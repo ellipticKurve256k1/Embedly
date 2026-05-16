@@ -16,6 +16,7 @@ import ChatInput from './ChatInput.jsx';
 import ChatSidebar from './ChatSidebar.jsx';
 import MessageList from './MessageList.jsx';
 import SourcesPanel from './SourcesPanel.jsx';
+import SetupRequiredNotice from './SetupRequiredNotice.jsx';
 import './ChatPanel.css';
 
 const MAX_SERVER_HISTORY_MESSAGES = 6;
@@ -61,7 +62,7 @@ function buildServerHistory(messages) {
     }));
 }
 
-export default function ChatPanel() {
+export default function ChatPanel({ settingsReady = true, missingSettings = [] }) {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState([]);
   const [conversations, setConversations] = useState([]);
@@ -307,6 +308,8 @@ export default function ChatPanel() {
   ]);
 
   const handleSend = useCallback(async (rawMessage) => {
+    if (!settingsReady) return;
+
     const messageText = rawMessage.trim();
     if (!messageText || isStreaming) return;
 
@@ -430,8 +433,31 @@ export default function ChatPanel() {
     persistConversation,
     setActiveConversationState,
     setMessagesState,
+    settingsReady,
     updateAssistantMessage,
   ]);
+
+  const chatContent = settingsReady ? (
+    <>
+      <MessageList messages={messages} isSearching={isSearching} />
+      {chatError && (
+        <div className="chat-panel__error" role="alert">
+          {chatError}
+        </div>
+      )}
+
+      <div className="chat-panel__footer">
+        <ChatInput
+          value={inputValue}
+          disabled={isStreaming}
+          onChange={setInputValue}
+          onSubmit={handleSend}
+        />
+      </div>
+    </>
+  ) : (
+    <SetupRequiredNotice feature="chat" missingSettings={missingSettings} />
+  );
 
   return (
     <section className="chat-panel" aria-label="Knowledge chat">
@@ -449,33 +475,21 @@ export default function ChatPanel() {
         />
 
         <div className="chat-panel__conversation">
-          <MessageList messages={messages} isSearching={isSearching} />
-          {chatError && (
-            <div className="chat-panel__error" role="alert">
-              {chatError}
-            </div>
-          )}
-
-          <div className="chat-panel__footer">
-            <ChatInput
-              value={inputValue}
-              disabled={isStreaming}
-              onChange={setInputValue}
-              onSubmit={handleSend}
-            />
-          </div>
+          {chatContent}
         </div>
 
-        <SourcesPanel
-          isOpen={!sourcesCollapsed}
-          chunks={retrievedChunks}
-          citedIndices={citedIndices}
-          retrievalQuery={retrievalQuery}
-          originalQuery={originalQuery}
-          wasRewritten={wasRewritten}
-          status={contextStatus}
-          onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
-        />
+        {settingsReady && (
+          <SourcesPanel
+            isOpen={!sourcesCollapsed}
+            chunks={retrievedChunks}
+            citedIndices={citedIndices}
+            retrievalQuery={retrievalQuery}
+            originalQuery={originalQuery}
+            wasRewritten={wasRewritten}
+            status={contextStatus}
+            onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
+          />
+        )}
       </div>
 
       {deleteTarget && (

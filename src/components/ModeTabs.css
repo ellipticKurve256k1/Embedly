@@ -32,6 +32,17 @@
   background: rgba(107, 92, 255, 0.08);
 }
 
+.mode-tab.is-disabled {
+  color: #9ba4b8;
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.mode-tab.is-disabled:hover {
+  color: #8c96ad;
+  background: rgba(132, 146, 184, 0.08);
+}
+
 .mode-tab.is-active {
   position: relative;
   color: #17213b;
