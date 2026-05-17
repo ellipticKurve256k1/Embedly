@@ -95,6 +95,7 @@ App
       ChatInput
     UploadBox (mode: upload)
       FileDropZone
+      ScopeToggle
       ProjectSelector
       ProjectChip
       TransferPane (available files)
@@ -294,10 +295,10 @@ User clicks Connect Wallet
 | `SourceItem` | `src/components/SourceItem.jsx` | Individual source row with cited state and document action. |
 | `ChatInput` | `src/components/ChatInput.jsx` | Collects and submits chat prompts. |
 | `DatasetScopeControl` | `src/components/DatasetScopeControl.jsx` | Full-width scope selector kept for large project-selection surfaces. |
-| `ScopeToggle` | `src/components/ScopeToggle.jsx` | Standout compact chat/search scope dropdown with project identity, scope label, side-aligned menu, settings link, and micro/compact/inline variants. |
+| `ScopeToggle` | `src/components/ScopeToggle.jsx` | Standout compact chat/search/upload scope dropdown with project identity, optional unassigned scope, scope label, side-aligned menu, settings link, and micro/compact/inline variants. |
 | `ProjectChip` | `src/components/ProjectChip.jsx` | Reusable project identity token with deterministic initials color, counts, all-documents, and unassigned states. |
 | `ProjectSelector` | `src/components/ProjectSelector.jsx` | Compact native dropdown for upload assignment controls. |
-| `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, transfer, selection, and job polling state. |
+| `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, project-scoped file filtering, transfer, selection, and job polling state. |
 | `FileDropZone` | `src/components/FileDropZone.jsx` | Drag-and-drop upload control. |
 | `TransferPane` | `src/components/TransferPane.jsx` | Available or knowledge-base file list. |
 | `FileTransferRow` | `src/components/FileTransferRow.jsx` | File row with status and selection. |

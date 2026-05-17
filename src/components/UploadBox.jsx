@@ -11,6 +11,7 @@ import EmbedActionBar from './EmbedActionBar.jsx';
 import FileDropZone from './FileDropZone.jsx';
 import ProjectChip from './ProjectChip.jsx';
 import ProjectSelector from './ProjectSelector.jsx';
+import ScopeToggle, { UNASSIGNED_SCOPE_VALUE } from './ScopeToggle.jsx';
 import TransferControls from './TransferControls.jsx';
 import TransferPane from './TransferPane.jsx';
 import './UploadBox.css';
@@ -27,6 +28,7 @@ const ACCEPTED_EXTENSIONS = ['pdf', 'txt', 'md', 'csv'];
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed']);
 const KNOWLEDGE_BASE_IDS_STORAGE_KEY = 'embeddly.knowledgeBaseIds';
+const UNASSIGNED_PROJECT_SCOPE = UNASSIGNED_SCOPE_VALUE;
 
 function isAcceptedFile(file) {
   const mimeType = file.type;
@@ -111,6 +113,12 @@ function isSettledJob(job) {
   return TERMINAL_JOB_STATUSES.has(job?.status) || TERMINAL_JOB_STATUSES.has(job?.stage);
 }
 
+function isDocumentInProjectScope(document, projectScopeId) {
+  if (!projectScopeId) return true;
+  if (projectScopeId === UNASSIGNED_PROJECT_SCOPE) return !document.projectId;
+  return document.projectId === projectScopeId;
+}
+
 export default function UploadBox({ projects = [] }) {
   const [documents, setDocuments] = useState([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
@@ -127,6 +135,8 @@ export default function UploadBox({ projects = [] }) {
   const [jobProgress, setJobProgress] = useState({});
   const [uploadingFiles, setUploadingFiles] = useState([]);
   const [uploadProjectId, setUploadProjectId] = useState(null);
+  const [scopeProjectId, setScopeProjectId] = useState(null);
+  const [scopeFlashKey, setScopeFlashKey] = useState(null);
   const [batchProjectId, setBatchProjectId] = useState(null);
   const [assignmentNotice, setAssignmentNotice] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -236,6 +246,12 @@ export default function UploadBox({ projects = [] }) {
     new Map(projects.map((project) => [project.id, project]))
   ), [projects]);
   const uploadProject = uploadProjectId ? projectById.get(uploadProjectId) ?? null : null;
+  const scopedProject = scopeProjectId && scopeProjectId !== UNASSIGNED_PROJECT_SCOPE
+    ? projectById.get(scopeProjectId) ?? null
+    : null;
+  const scopeName = scopeProjectId === UNASSIGNED_PROJECT_SCOPE
+    ? 'No project'
+    : scopedProject?.name ?? 'All Documents';
   const batchProject = batchProjectId ? projectById.get(batchProjectId) ?? null : null;
   const quickUploadProjects = useMemo(() => (
     [...projects]
@@ -280,6 +296,16 @@ export default function UploadBox({ projects = [] }) {
   }, [documents, projects]);
 
   useEffect(() => {
+    if (
+      scopeProjectId
+      && scopeProjectId !== UNASSIGNED_PROJECT_SCOPE
+      && !projectById.has(scopeProjectId)
+    ) {
+      setScopeProjectId(null);
+    }
+  }, [projectById, scopeProjectId]);
+
+  useEffect(() => {
     const existingIds = new Set(documentViews.map((view) => view.document.id));
     const autoKnowledgeBaseIds = documentViews
       .filter(shouldAutoKeepInKnowledgeBase)
@@ -300,9 +326,36 @@ export default function UploadBox({ projects = [] }) {
     ));
   }, [documentViews]);
 
-  const leftViews = useMemo(() => (
+  const scopedDocumentViews = useMemo(() => (
+    documentViews.filter((view) => isDocumentInProjectScope(view.document, scopeProjectId))
+  ), [documentViews, scopeProjectId]);
+
+  useEffect(() => {
+    const visibleScopedIds = new Set(scopedDocumentViews.map((view) => view.document.id));
+
+    setLeftSelection((currentIds) => (
+      new Set([...currentIds].filter((id) => visibleScopedIds.has(id)))
+    ));
+    setRightSelection((currentIds) => (
+      new Set([...currentIds].filter((id) => visibleScopedIds.has(id)))
+    ));
+  }, [scopedDocumentViews]);
+
+  const allLeftViews = useMemo(() => (
     documentViews.filter((view) => !knowledgeBaseIds.has(view.document.id))
   ), [documentViews, knowledgeBaseIds]);
+
+  const leftViews = useMemo(() => (
+    scopedDocumentViews.filter((view) => !knowledgeBaseIds.has(view.document.id))
+  ), [knowledgeBaseIds, scopedDocumentViews]);
+
+  const visibleUploadingFiles = useMemo(() => (
+    uploadingFiles.filter(() => (
+      !scopeProjectId
+      || (scopeProjectId === UNASSIGNED_PROJECT_SCOPE && !uploadProjectId)
+      || scopeProjectId === uploadProjectId
+    ))
+  ), [scopeProjectId, uploadProjectId, uploadingFiles]);
 
   const visibleLeftViews = useMemo(() => {
     const searchedViews = leftViews.filter(({ document }) => (
@@ -316,11 +369,17 @@ export default function UploadBox({ projects = [] }) {
     });
   }, [debouncedLeftSearch, leftViews]);
 
-  const rightViews = useMemo(() => (
+  const allRightViews = useMemo(() => (
     documentViews
       .filter((view) => knowledgeBaseIds.has(view.document.id))
       .sort((a, b) => a.document.filename.localeCompare(b.document.filename))
   ), [documentViews, knowledgeBaseIds]);
+
+  const rightViews = useMemo(() => (
+    scopedDocumentViews
+      .filter((view) => knowledgeBaseIds.has(view.document.id))
+      .sort((a, b) => a.document.filename.localeCompare(b.document.filename))
+  ), [knowledgeBaseIds, scopedDocumentViews]);
 
   const visibleRightViews = useMemo(() => (
     rightViews.filter(({ document }) => (
@@ -359,6 +418,29 @@ export default function UploadBox({ projects = [] }) {
   const embeddableKnowledgeViews = rightViews.filter((view) => (
     view.statusGroup === 'pending' || view.statusGroup === 'failed'
   ));
+
+  const isProjectScoped = Boolean(scopeProjectId);
+  const filteredDocumentCount = scopedDocumentViews.length;
+  const scopeContextLabel = isProjectScoped
+    ? `Viewing ${filteredDocumentCount} of ${documents.length} document${documents.length === 1 ? '' : 's'} in ${scopeName}`
+    : `${documents.length} document${documents.length === 1 ? '' : 's'} across all projects`;
+
+  const handleScopeProjectChange = useCallback((projectId) => {
+    setScopeProjectId(projectId);
+    setLeftSelection(new Set());
+    setRightSelection(new Set());
+    const nextFlashKey = `${projectId ?? 'all'}-${Date.now()}`;
+    setScopeFlashKey(nextFlashKey);
+    window.setTimeout(() => {
+      setScopeFlashKey((currentKey) => (currentKey === nextFlashKey ? null : currentKey));
+    }, 700);
+
+    if (projectId === UNASSIGNED_PROJECT_SCOPE) {
+      setUploadProjectId(null);
+    } else if (projectId) {
+      setUploadProjectId(projectId);
+    }
+  }, []);
 
   const handleFiles = useCallback(async (incoming) => {
     const accepted = [];
@@ -719,31 +801,77 @@ export default function UploadBox({ projects = [] }) {
           />
         </div>
 
-        <div className="upload-project-summary" aria-label="Project document summary">
-          <span className="upload-project-summary__label">Projects</span>
-          <ProjectChip
-            label="All Documents"
-            documentCount={projectSummary.totalCount}
-            variant="compact"
-            showCount
-          />
-          {projectSummary.projectCounts.map((project) => (
-            <ProjectChip
-              key={project.id}
-              project={project}
-              documentCount={project.documentCount}
-              variant="compact"
-              showCount
+        <div className="upload-scope-panel" aria-label="Upload project scope">
+          <div className="upload-scope-control">
+            <div className="upload-scope-control__copy">
+              <span>Viewing</span>
+              <strong>{scopeContextLabel}</strong>
+            </div>
+            <ScopeToggle
+              projects={projects}
+              value={scopeProjectId}
+              showUnassignedOption
+              flashKey={scopeFlashKey}
+              onChange={handleScopeProjectChange}
             />
-          ))}
-          <ProjectChip
-            label="No project"
-            documentCount={projectSummary.unassignedCount}
-            state="unassigned"
-            variant="compact"
-            showCount
-            className={projectSummary.unassignedCount > 0 ? 'has-unassigned-count' : ''}
-          />
+            {isProjectScoped && (
+              <button
+                className="upload-scope-control__clear"
+                type="button"
+                onClick={() => handleScopeProjectChange(null)}
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
+
+          <div className="upload-project-summary" aria-label="Project document summary">
+            <span className="upload-project-summary__label">Projects</span>
+            <button
+              className={`upload-project-summary__chip${!scopeProjectId ? ' is-active' : ''}`}
+              type="button"
+              aria-pressed={!scopeProjectId}
+              onClick={() => handleScopeProjectChange(null)}
+            >
+              <ProjectChip
+                label="All Documents"
+                documentCount={projectSummary.totalCount}
+                variant="compact"
+                showCount
+              />
+            </button>
+            {projectSummary.projectCounts.map((project) => (
+              <button
+                className={`upload-project-summary__chip${scopeProjectId === project.id ? ' is-active' : ''}`}
+                type="button"
+                aria-pressed={scopeProjectId === project.id}
+                key={project.id}
+                onClick={() => handleScopeProjectChange(project.id)}
+              >
+                <ProjectChip
+                  project={project}
+                  documentCount={project.documentCount}
+                  variant="compact"
+                  showCount
+                />
+              </button>
+            ))}
+            <button
+              className={`upload-project-summary__chip${scopeProjectId === UNASSIGNED_PROJECT_SCOPE ? ' is-active' : ''}`}
+              type="button"
+              aria-pressed={scopeProjectId === UNASSIGNED_PROJECT_SCOPE}
+              onClick={() => handleScopeProjectChange(UNASSIGNED_PROJECT_SCOPE)}
+            >
+              <ProjectChip
+                label="No project"
+                documentCount={projectSummary.unassignedCount}
+                state="unassigned"
+                variant="compact"
+                showCount
+                className={projectSummary.unassignedCount > 0 ? 'has-unassigned-count' : ''}
+              />
+            </button>
+          </div>
         </div>
 
         {errorMessage && (
@@ -755,10 +883,12 @@ export default function UploadBox({ projects = [] }) {
         <section className="transfer-workspace" aria-label="Upload selection workspace">
           <TransferPane
             title="Available Files"
-            count={leftViews.length + uploadingFiles.length}
+            count={leftViews.length + visibleUploadingFiles.length}
+            totalCount={isProjectScoped ? allLeftViews.length + uploadingFiles.length : null}
+            projectScopeName={isProjectScoped ? scopeName : ''}
             variant="available"
             views={visibleLeftViews}
-            uploadingFiles={uploadingFiles}
+            uploadingFiles={visibleUploadingFiles}
             isLoading={isLoadingDocuments}
             searchValue={leftSearch}
             onSearchChange={setLeftSearch}
@@ -770,10 +900,21 @@ export default function UploadBox({ projects = [] }) {
             onSelectFile={selectLeftFile}
             onRemoveFile={removeDocument}
             projects={projects}
+            projectScopeId={scopeProjectId}
             onProjectChange={assignDocumentProject}
-            emptyTitle={documents.length === 0 ? 'Upload files to build your pool' : 'No files match this search'}
+            emptyTitle={documents.length === 0
+              ? 'Upload files to build your pool'
+              : isProjectScoped && scopedDocumentViews.length === 0
+                ? `No documents in ${scopeName}`
+                : leftViews.length === 0 && isProjectScoped
+                  ? `No available files in ${scopeName}`
+                  : 'No files match this search'}
             emptyBody={documents.length === 0
               ? 'Files stay here until you move them into the knowledge base.'
+              : isProjectScoped && scopedDocumentViews.length === 0
+                ? `Use the drop zone to upload files${scopeProjectId && scopeProjectId !== UNASSIGNED_PROJECT_SCOPE ? ` to ${scopeName}` : ''}, or clear the filter to see all documents.`
+                : leftViews.length === 0 && isProjectScoped
+                  ? 'Files in this scope are already in the knowledge base, or clear the filter to see more files.'
               : 'Clear or change the search filter to see more files.'}
           />
 
@@ -787,6 +928,8 @@ export default function UploadBox({ projects = [] }) {
           <TransferPane
             title="Knowledge Base"
             count={rightViews.length}
+            totalCount={isProjectScoped ? allRightViews.length : null}
+            projectScopeName={isProjectScoped ? scopeName : ''}
             variant="knowledge"
             views={visibleRightViews}
             searchValue={rightSearch}
@@ -801,10 +944,15 @@ export default function UploadBox({ projects = [] }) {
             onEmbedFile={embedSingleDocument}
             isActionDisabled={isEmbeddingAny}
             projects={projects}
+            projectScopeId={scopeProjectId}
             onProjectChange={assignDocumentProject}
-            emptyTitle={rightViews.length === 0 ? 'Knowledge base is empty' : 'No knowledge base files match this search'}
+            emptyTitle={rightViews.length === 0
+              ? isProjectScoped ? `No knowledge base files in ${scopeName}` : 'Knowledge base is empty'
+              : 'No knowledge base files match this search'}
             emptyBody={rightViews.length === 0
-              ? 'Move available files here to queue them for embedding.'
+              ? isProjectScoped
+                ? 'Move files from this scoped available list, or clear the filter to see the full knowledge base.'
+                : 'Move available files here to queue them for embedding.'
               : 'Clear or change the search filter to see more files.'}
           />
         </section>

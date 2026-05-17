@@ -4,6 +4,8 @@ import FileTransferRow, { UploadingTransferRow } from './FileTransferRow.jsx';
 export default function TransferPane({
   title,
   count,
+  totalCount = null,
+  projectScopeName = '',
   variant,
   views = [],
   uploadingFiles = [],
@@ -20,6 +22,7 @@ export default function TransferPane({
   isActionDisabled = false,
   onClearAll,
   projects = [],
+  projectScopeId = null,
   onProjectChange,
   searchPlaceholder = 'Search files...',
   emptyTitle,
@@ -28,13 +31,17 @@ export default function TransferPane({
   const showSearch = typeof searchValue === 'string' && onSearchChange;
   const hasRows = views.length > 0 || uploadingFiles.length > 0;
   const showClear = Boolean(onClearAll) && count > 0;
+  const hasFilteredCount = Number.isFinite(totalCount) && totalCount !== count;
 
   return (
     <section className={`transfer-pane is-${variant}`} aria-label={title}>
       <header className="transfer-pane-header">
         <div className="transfer-pane-title">
           <strong>{title}</strong>
-          <span>{count}</span>
+          <span>{hasFilteredCount ? `${count} of ${totalCount}` : count}</span>
+          {projectScopeName && (
+            <small>in {projectScopeName}</small>
+          )}
         </div>
 
         {showClear && (
@@ -90,6 +97,7 @@ export default function TransferPane({
               onEmbed={onEmbedFile}
               isActionDisabled={isActionDisabled}
               projects={projects}
+              projectScopeId={projectScopeId}
               onProjectChange={onProjectChange}
             />
           ))

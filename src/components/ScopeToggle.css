@@ -75,6 +75,18 @@
     rgba(255, 255, 255, 0.84);
 }
 
+.scope-toggle.is-unassigned .scope-toggle__trigger {
+  border-color: rgba(138, 92, 22, 0.34);
+  color: #8a5c16;
+  background:
+    linear-gradient(135deg, rgba(213, 153, 57, 0.14), rgba(255, 255, 255, 0.9) 44%),
+    rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 12px 26px rgba(76, 88, 139, 0.1),
+    inset 3px 0 0 rgba(138, 92, 22, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
 .scope-toggle--normal .scope-toggle__trigger {
   border-color: rgba(132, 146, 184, 0.18);
   color: #65718b;
@@ -240,9 +252,21 @@
   background: rgba(132, 146, 184, 0.12);
 }
 
+.scope-toggle__neutral-icon.is-unassigned {
+  color: #8a5c16;
+  background: rgba(213, 153, 57, 0.14);
+  font-size: 12px;
+  font-weight: 950;
+}
+
 .scope-toggle__item.is-active .scope-toggle__neutral-icon {
   color: #6258ff;
   background: rgba(98, 88, 255, 0.12);
+}
+
+.scope-toggle__item.is-active .scope-toggle__neutral-icon.is-unassigned {
+  color: #8a5c16;
+  background: rgba(213, 153, 57, 0.2);
 }
 
 .scope-toggle__separator {

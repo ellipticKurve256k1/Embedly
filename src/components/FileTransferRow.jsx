@@ -1,6 +1,7 @@
 import { LoaderCircle, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import FileIcon from './FileIcon.jsx';
 import ProjectChip from './ProjectChip.jsx';
+import { UNASSIGNED_SCOPE_VALUE } from './ScopeToggle.jsx';
 
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
 
@@ -88,6 +89,7 @@ export default function FileTransferRow({
   onEmbed,
   isActionDisabled,
   projects = [],
+  projectScopeId = null,
   onProjectChange,
 }) {
   const { document, displayStatus, progress, project, statusGroup } = view;
@@ -99,9 +101,20 @@ export default function FileTransferRow({
   const showRetry = isKnowledge && statusGroup === 'failed';
   const checkboxLabel = `${isSelected ? 'Deselect' : 'Select'} ${document.filename}`;
   const errorMessage = document.error || progress?.error || '';
+  const isScopeMatch = !projectScopeId
+    || (projectScopeId === UNASSIGNED_SCOPE_VALUE && !document.projectId)
+    || document.projectId === projectScopeId;
 
   return (
-    <div className={`transfer-row is-${displayStatus}${isSelected ? ' is-selected' : ''}${!isSelectable ? ' is-disabled' : ''}`}>
+    <div
+      className={[
+        'transfer-row',
+        `is-${displayStatus}`,
+        isSelected ? 'is-selected' : '',
+        !isSelectable ? 'is-disabled' : '',
+        projectScopeId ? isScopeMatch ? 'is-scope-match' : 'is-scope-mismatch' : '',
+      ].filter(Boolean).join(' ')}
+    >
       <label className="transfer-row-check">
         <input
           type="checkbox"

@@ -202,6 +202,7 @@ Visual rules:
 |-----------|-------------|
 | `UploadBox` | Owns file loading, transfer state, selections, and job polling. |
 | `FileDropZone` | Compact drag-and-drop area for accepted files. |
+| `ScopeToggle` | Upload file-view filter for All Documents, one project, or No project. |
 | `ProjectSelector` | New-upload project selector and batch assignment selector. |
 | `ProjectChip` | Compact row and summary identity for assigned or unassigned project state. |
 | `TransferPane` | Left or right file list with search and selection. |
@@ -217,7 +218,8 @@ Visual rules:
 - Project chips on rows should make assignment visible without competing with filename and processing status.
 - Unassigned rows use the warning-tinted `ProjectChip` state so missing categorization feels incomplete.
 - Batch assignment uses a sticky glass bar labeled "Assign to project" with selected count, target project, primary Apply action, and clear selection affordance.
-- A project summary strip above transfer panes shows All Documents, each project count, and No project count.
+- A project scope panel above transfer panes combines a compact `ScopeToggle`, clear-filter action, and clickable summary chips for All Documents, each project count, and No project count.
+- When upload scope is active, both transfer panes show only matching documents and headers show filtered counts such as "12 of 50".
 - Per-row project dropdowns and compact assignment controls use native selects to keep repeated file triage fast.
 - Active stages such as parsing, chunking, embedding, and indexing use progress treatment.
 - Failed rows must keep the retry or return path clear.
