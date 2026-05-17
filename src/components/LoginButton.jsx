@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LogOut, UserRound, Zap } from 'lucide-react';
 import {
   clearSessionToken,
@@ -94,11 +95,12 @@ export default function LoginButton() {
           <Zap size={18} />
           <span>Connect Wallet</span>
         </button>
-        {isModalOpen && (
+        {isModalOpen && createPortal(
           <LoginModal
             onClose={() => setIsModalOpen(false)}
             onAuthenticated={refreshAuthState}
-          />
+          />,
+          document.body,
         )}
       </>
     );

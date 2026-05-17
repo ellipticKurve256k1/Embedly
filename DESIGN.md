@@ -262,6 +262,7 @@ Visual rules:
 - Logged-out state uses a compact glass button with a `Zap` icon and "Connect Wallet" label on desktop.
 - Mobile keeps the login control icon-sized to preserve topbar space.
 - Logged-in state displays a truncated wallet public key and a small dropdown with "Disconnect".
+- Login modals render through a document-level portal so they sit above page shells, settings panels, dropdowns, and popovers.
 - Modal status text must be concise and fixed-height enough to avoid layout shift while polling.
 - QR code sits in a simple glass frame and remains the primary visual focus.
 - The copy action stays available even when browser-wallet connection fails.
