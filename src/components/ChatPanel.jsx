@@ -8,6 +8,7 @@ import {
   getChatState,
   initDB,
   deleteConversation,
+  persistConversationStart,
   saveConversation,
   setChatState,
   trimConversationMessages,
@@ -242,7 +243,7 @@ export default function ChatPanel({
       isMounted = false;
       window.removeEventListener('focus', handleWindowFocus);
       if (activeConversationIdRef.current && messagesRef.current.length > 0) {
-        saveConversation({
+        void saveConversation({
           id: activeConversationIdRef.current,
           title: conversationsRef.current.find(
             (conversation) => conversation.id === activeConversationIdRef.current,
@@ -251,7 +252,7 @@ export default function ChatPanel({
           createdAt: conversationsRef.current.find(
             (conversation) => conversation.id === activeConversationIdRef.current,
           )?.createdAt ?? new Date().toISOString(),
-        });
+        }).then(() => refreshConversationList());
       }
       abortControllerRef.current?.abort();
     };
@@ -354,8 +355,9 @@ export default function ChatPanel({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    const isFirstMessage = !activeConversationIdRef.current;
     const conversationId = activeConversationIdRef.current ?? crypto.randomUUID();
-    if (!activeConversationIdRef.current) {
+    if (isFirstMessage) {
       setActiveConversationState(conversationId);
     }
 
@@ -377,6 +379,11 @@ export default function ChatPanel({
     setIsStreaming(true);
 
     try {
+      if (isFirstMessage) {
+        await persistConversationStart(conversationId, messageText, selectedProjectId);
+        await refreshConversationList();
+      }
+
       await streamChatResponse({
         message: messageText,
         conversationId,
@@ -469,6 +476,7 @@ export default function ChatPanel({
   }, [
     isStreaming,
     persistConversation,
+    refreshConversationList,
     selectedProjectId,
     setActiveConversationState,
     setMessagesState,

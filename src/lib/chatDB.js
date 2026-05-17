@@ -157,6 +157,25 @@ export async function saveConversation(conversation) {
   }
 }
 
+export async function persistConversationStart(conversationId, firstUserMessage, projectId = null) {
+  if (!conversationId) return null;
+
+  const now = new Date().toISOString();
+  return saveConversation({
+    id: conversationId,
+    title: generateTitle(firstUserMessage),
+    messages: [{
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: firstUserMessage ?? '',
+      createdAt: now,
+    }],
+    projectId: projectId || null,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
 export async function getConversation(id) {
   try {
     return await withStore(STORE_CONVERSATIONS, 'readonly', (store) => store.get(id));
