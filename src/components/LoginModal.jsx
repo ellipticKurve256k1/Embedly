@@ -304,20 +304,6 @@ export default function LoginModal({ onClose, onAuthenticated }) {
             onFocus={(event) => event.target.select()}
           />
         </label>
-
-        <button
-          className="login-modal__webln"
-          type="button"
-          onClick={handleWebLnConnect}
-          disabled={!canUseChallenge || status === 'loading' || isConnectingWallet}
-        >
-          {isConnectingWallet ? (
-            <LoaderCircle className="login-modal__button-spinner" size={18} />
-          ) : (
-            <Zap size={18} />
-          )}
-          <span>{isConnectingWallet ? 'Connecting' : 'Use Browser Wallet'}</span>
-        </button>
       </div>
     </div>
   );
