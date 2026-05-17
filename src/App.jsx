@@ -20,6 +20,7 @@ import ChatPanel from './components/ChatPanel';
 import LoginButton from './components/LoginButton';
 import SetupRequiredNotice from './components/SetupRequiredNotice';
 import ScopeToggle from './components/ScopeToggle';
+import EmbeddingIndicator from './components/EmbeddingIndicator';
 
 function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
   const missingSettings = [];
@@ -252,6 +253,7 @@ export default function App() {
             onNavigateToSettings={handleNavigateToSettings}
           />
           <div className="topbar-actions">
+            <EmbeddingIndicator />
             <ModelStatusBar
               embeddingSetup={embeddingSetup}
               llmSetup={llmSetup}

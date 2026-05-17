@@ -5,6 +5,7 @@ import {
   deleteDocument,
   deleteProject,
   getDocuments,
+  getEmbedStatus,
   getProjects,
   getJobs,
   searchQuery,
@@ -84,10 +85,21 @@ test('startEmbedding sends document ids and chunking config', async () => {
     const body = JSON.parse(options.body);
     assert.deepEqual(body.documentIds, ['doc-1']);
     assert.equal(body.chunking.strategy, 'recursive');
-    return jsonResponse({ jobId: 'job-1' });
+    return jsonResponse({ jobs: [{ id: 'job-1', documentId: 'doc-1' }] }, { status: 202 });
   };
 
-  assert.deepEqual(await startEmbedding(['doc-1']), { jobId: 'job-1' });
+  assert.deepEqual(await startEmbedding(['doc-1']), {
+    jobs: [{ id: 'job-1', documentId: 'doc-1' }],
+  });
+});
+
+test('getEmbedStatus returns queue status', async () => {
+  global.fetch = async (url) => {
+    assert.match(url, /\/api\/embed\/status$/);
+    return jsonResponse({ activeJobs: [], queueLength: 0 });
+  };
+
+  assert.deepEqual(await getEmbedStatus(), { activeJobs: [], queueLength: 0 });
 });
 
 test('getJobs returns parsed jobs response', async () => {

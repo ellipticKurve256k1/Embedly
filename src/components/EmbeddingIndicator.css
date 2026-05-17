@@ -1,0 +1,135 @@
+.embedding-indicator {
+  width: min(250px, 28vw);
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px;
+  border: 1px solid rgba(132, 146, 184, 0.22);
+  border-radius: 14px;
+  color: #6258ff;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 12px 28px rgba(83, 96, 148, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.embedding-indicator__icon {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: rgba(98, 88, 255, 0.1);
+}
+
+.embedding-indicator.is-active .embedding-indicator__icon svg {
+  animation: embedding-indicator-spin 900ms linear infinite;
+}
+
+.embedding-indicator.is-failed {
+  color: #9f4452;
+  border-color: rgba(210, 83, 100, 0.18);
+  background: rgba(255, 246, 248, 0.92);
+}
+
+.embedding-indicator.is-failed .embedding-indicator__icon {
+  background: rgba(210, 83, 100, 0.1);
+}
+
+.embedding-indicator.is-completed {
+  color: #27745b;
+  border-color: rgba(39, 116, 91, 0.18);
+  background: rgba(246, 255, 250, 0.9);
+}
+
+.embedding-indicator.is-completed .embedding-indicator__icon {
+  background: rgba(39, 116, 91, 0.1);
+}
+
+.embedding-indicator__content {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  flex: 1 1 auto;
+}
+
+.embedding-indicator__content strong,
+.embedding-indicator__content > span:not(.embedding-indicator__progress) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedding-indicator__content strong {
+  color: #24304b;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.1;
+}
+
+.embedding-indicator__content > span:not(.embedding-indicator__progress) {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.embedding-indicator__progress {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(132, 146, 184, 0.18);
+}
+
+.embedding-indicator__progress span {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6258ff, #7c74ff);
+  transition: width 220ms ease;
+}
+
+.embedding-indicator__database {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.embedding-indicator svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+@keyframes embedding-indicator-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .embedding-indicator {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .embedding-indicator__content,
+  .embedding-indicator__database {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

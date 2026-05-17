@@ -209,6 +209,7 @@ Visual rules:
 | `FileTransferRow` | Individual file row with icon, metadata, selection, and status. |
 | `TransferControls` | Move selected files between panes. |
 | `EmbedActionBar` | Summarizes selected knowledge-base files and starts embedding. |
+| `EmbeddingIndicator` | Compact topbar status for background embedding activity across chat, search, upload, and settings. |
 
 Visual rules:
 
@@ -222,6 +223,7 @@ Visual rules:
 - When upload scope is active, both transfer panes show only matching documents and headers show filtered counts such as "12 of 50".
 - Per-row project dropdowns and compact assignment controls use native selects to keep repeated file triage fast.
 - Active stages such as parsing, chunking, embedding, and indexing use progress treatment.
+- Background embedding progress also appears in the topbar as a compact glass indicator with chunk progress, completion, or failure state.
 - Failed rows must keep the retry or return path clear.
 - Upload errors should appear near the upload workflow rather than in global chrome.
 

@@ -7,6 +7,7 @@ import {
   updateDocumentProject,
   uploadFiles,
 } from '../lib/api.js';
+import { useEmbedding } from '../lib/embeddingContext.jsx';
 import EmbedActionBar from './EmbedActionBar.jsx';
 import FileDropZone from './FileDropZone.jsx';
 import ProjectChip from './ProjectChip.jsx';
@@ -120,6 +121,7 @@ function isDocumentInProjectScope(document, projectScopeId) {
 }
 
 export default function UploadBox({ projects = [] }) {
+  const { activeJobs, recentJobs, isStreaming: isEmbeddingStreamConnected } = useEmbedding();
   const [documents, setDocuments] = useState([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -176,6 +178,10 @@ export default function UploadBox({ projects = [] }) {
   }, [knowledgeBaseIds]);
 
   useEffect(() => {
+    if (isEmbeddingStreamConnected) {
+      return undefined;
+    }
+
     const activeDocumentIds = new Set([
       ...documents
         .filter((document) => ACTIVE_STATUSES.has(document.status))
@@ -240,7 +246,50 @@ export default function UploadBox({ projects = [] }) {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [documents, embeddingDocumentIds, refreshDocuments]);
+  }, [documents, embeddingDocumentIds, isEmbeddingStreamConnected, refreshDocuments]);
+
+  useEffect(() => {
+    const nextProgressByDocumentId = {};
+    const nextActiveDocumentIds = new Set();
+
+    activeJobs.forEach((job) => {
+      if (!job.documentId) return;
+      nextProgressByDocumentId[job.documentId] = job;
+      nextActiveDocumentIds.add(job.documentId);
+    });
+
+    if (nextActiveDocumentIds.size > 0) {
+      setEmbeddingDocumentIds((currentIds) => new Set([...currentIds, ...nextActiveDocumentIds]));
+      setJobProgress((currentProgress) => ({
+        ...currentProgress,
+        ...nextProgressByDocumentId,
+      }));
+    }
+  }, [activeJobs]);
+
+  useEffect(() => {
+    const settledDocumentIds = recentJobs
+      .map((job) => job.documentId)
+      .filter(Boolean);
+
+    if (settledDocumentIds.length === 0) {
+      return;
+    }
+
+    setEmbeddingDocumentIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      settledDocumentIds.forEach((id) => nextIds.delete(id));
+      return nextIds;
+    });
+    setJobProgress((currentProgress) => {
+      const nextProgress = { ...currentProgress };
+      settledDocumentIds.forEach((id) => {
+        delete nextProgress[id];
+      });
+      return nextProgress;
+    });
+    refreshDocuments().catch(() => {});
+  }, [recentJobs, refreshDocuments]);
 
   const projectById = useMemo(() => (
     new Map(projects.map((project) => [project.id, project]))
@@ -700,17 +749,30 @@ export default function UploadBox({ projects = [] }) {
     setRightSelection(new Set());
 
     try {
-      await startEmbedding(documentIds);
+      const payload = await startEmbedding(documentIds);
+      const queuedJobs = payload.jobs ?? [];
+
+      if (queuedJobs.length > 0) {
+        setJobProgress((currentProgress) => {
+          const nextProgress = { ...currentProgress };
+          queuedJobs.forEach((job) => {
+            if (job.documentId) {
+              nextProgress[job.documentId] = job;
+            }
+          });
+          return nextProgress;
+        });
+      }
+
       await refreshDocuments();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Embedding failed.');
-      await refreshDocuments().catch(() => {});
-    } finally {
       setEmbeddingDocumentIds((currentIds) => {
         const nextIds = new Set(currentIds);
         documentIds.forEach((id) => nextIds.delete(id));
         return nextIds;
       });
+      await refreshDocuments().catch(() => {});
     }
   }, [refreshDocuments]);
 

@@ -121,7 +121,7 @@ Request flow:
 HTTP request -> route handler -> service layer -> SQLite or provider API -> response
 ```
 
-Long-running embedding work currently runs inside the `/api/embed` request path while updating `embedding_jobs`. Chat uses SSE to stream context, tokens, and completion metadata back to the browser. Client-side chat history is the source of truth; the server keeps only a short in-memory hot cache and can rehydrate that cache from recent history sent in `/api/chat` requests.
+Long-running embedding work is queued by `/api/embed` and processed by an in-process background worker while updating `embedding_jobs`. `/api/embed/events` streams queue and progress updates over SSE so the frontend can show embedding progress outside Upload mode. Chat uses SSE to stream context, tokens, and completion metadata back to the browser. Client-side chat history is the source of truth; the server keeps only a short in-memory hot cache and can rehydrate that cache from recent history sent in `/api/chat` requests.
 
 ## 6. Database Schema
 
@@ -180,7 +180,9 @@ Settings keys:
 | `/api/documents/:id` | GET | Fetch one document with chunks. |
 | `/api/documents/:id` | PATCH | Assign or clear a document project with `{ projectId }`. |
 | `/api/documents/:id` | DELETE | Delete a document, uploaded file, chunks, embeddings, and jobs. |
-| `/api/embed` | POST | Parse, chunk, embed, and index selected documents. |
+| `/api/embed` | POST | Queue selected documents for background parsing, chunking, embedding, and indexing. |
+| `/api/embed/status` | GET | Return active queue state and recent completed embedding jobs. |
+| `/api/embed/events` | GET | Stream embedding queue and progress updates over SSE. |
 | `/api/jobs` | GET | List embedding jobs. |
 | `/api/jobs/:id` | GET | Fetch one embedding job. |
 | `/api/search` | GET | Run semantic search for `q`, optionally with `model`. |
@@ -202,6 +204,7 @@ User selects files
   -> user moves files into Knowledge Base pane
   -> user can assign or batch-assign projects without re-embedding
   -> POST /api/embed
+  -> embedding jobs are queued and the response returns immediately
   -> parser extracts text
   -> chunker splits content
   -> embedder calls Ollama
@@ -282,6 +285,7 @@ User clicks Connect Wallet
 | `App` | `src/App.jsx` | Root routing, mode switching, settings initialization. |
 | `ModeTabs` | `src/components/ModeTabs.jsx` | Switches between chat, upload, and search modes. |
 | `ModelStatusBar` | `src/components/ModelStatusBar.jsx` | Shows configured embedding, generation, and vector DB state. |
+| `EmbeddingIndicator` | `src/components/EmbeddingIndicator.jsx` | Topbar status surface for active background embedding jobs and recent completion/failure. |
 | `LoginButton` | `src/components/LoginButton.jsx` | Shows wallet login state and disconnect menu. |
 | `LoginModal` | `src/components/LoginModal.jsx` | Displays LNURL QR code, copy action, browser-wallet auth action, and polling status. |
 | `ChatPanel` | `src/components/ChatPanel.jsx` | Owns active chat state, IndexedDB persistence, sidebar actions, and streaming lifecycle. |
@@ -298,7 +302,7 @@ User clicks Connect Wallet
 | `ScopeToggle` | `src/components/ScopeToggle.jsx` | Standout compact chat/search/upload scope dropdown with project identity, optional unassigned scope, scope label, side-aligned menu, settings link, and micro/compact/inline variants. |
 | `ProjectChip` | `src/components/ProjectChip.jsx` | Reusable project identity token with deterministic initials color, counts, all-documents, and unassigned states. |
 | `ProjectSelector` | `src/components/ProjectSelector.jsx` | Compact native dropdown for upload assignment controls. |
-| `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, project-scoped file filtering, transfer, selection, and job polling state. |
+| `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, project-scoped file filtering, transfer, selection, and detailed job progress state. |
 | `FileDropZone` | `src/components/FileDropZone.jsx` | Drag-and-drop upload control. |
 | `TransferPane` | `src/components/TransferPane.jsx` | Available or knowledge-base file list. |
 | `FileTransferRow` | `src/components/FileTransferRow.jsx` | File row with status and selection. |
@@ -315,6 +319,7 @@ User clicks Connect Wallet
 | Parser | `server/services/parser.js` | Extract text from PDF, CSV, text, and Markdown uploads. |
 | Chunker | `server/services/chunker.js` | Split text into recursive, paragraph, or fixed chunks. |
 | Embedder | `server/services/embedder.js` | Generate embedding vectors through Ollama. |
+| Embed queue | `server/services/embedQueue.js` | Queue documents, process background embedding jobs, persist progress, and broadcast SSE updates. |
 | Retrieval | `server/services/retrieval.js` | Embed queries, retrieve candidates by vector similarity, and optionally return reranked chunks. |
 | Reranker | `server/services/reranker.js` | Lazy-load a local Transformers.js cross-encoder and score query/chunk pairs. |
 | LLM | `server/services/llm.js` | Build prompts, rewrite follow-up queries, stream chat responses. |

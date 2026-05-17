@@ -138,6 +138,17 @@ export async function startEmbedding(documentIds) {
   return parseResponse(response);
 }
 
+export async function getEmbedStatus() {
+  const response = await fetch(`${API_BASE}/embed/status`, {
+    headers: getAuthHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export function getEmbedEventsUrl() {
+  return `${API_BASE}/embed/events`;
+}
+
 export async function getJobs() {
   const response = await fetch(`${API_BASE}/jobs`, {
     headers: getAuthHeaders(),

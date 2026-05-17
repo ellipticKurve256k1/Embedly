@@ -3,6 +3,7 @@ import test, { afterEach } from 'node:test';
 import express from 'express';
 import { db, nowIso } from '../db.js';
 import documentsRouter from './documents.js';
+import embedRouter from './embed.js';
 import projectsRouter from './projects.js';
 import searchRouter from './search.js';
 import settingsRouter from './settings.js';
@@ -16,6 +17,7 @@ function createApp() {
     response.json({ status: 'ok' });
   });
   app.use('/api/documents', documentsRouter);
+  app.use('/api/embed', embedRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/settings', settingsRouter);
@@ -58,6 +60,14 @@ test('GET /api/documents returns documents array', async () => {
   const response = await dispatchExpress(createApp(), { path: '/api/documents' });
   assert.equal(response.status, 200);
   assert.ok(Array.isArray(response.body.documents));
+});
+
+test('GET /api/embed/status returns queue status', async () => {
+  const response = await dispatchExpress(createApp(), { path: '/api/embed/status' });
+
+  assert.equal(response.status, 200);
+  assert.ok(Array.isArray(response.body.activeJobs));
+  assert.ok(Number.isInteger(response.body.queueLength));
 });
 
 test('POST /api/projects creates a project', async () => {

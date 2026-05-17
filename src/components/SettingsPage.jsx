@@ -35,6 +35,7 @@ import {
   saveVectorDbSetup,
 } from '../lib/storage.js';
 import LoginButton from './LoginButton';
+import EmbeddingIndicator from './EmbeddingIndicator';
 import ProjectChip from './ProjectChip.jsx';
 import './SettingsPage.css';
 
@@ -463,6 +464,7 @@ export default function SettingsPage() {
             <img className="brand-logo" src={logoSrc} alt="Embeddly" />
           </a>
           <div className="topbar-actions">
+            <EmbeddingIndicator />
             <LoginButton />
             <a className="icon-button" href="#/" aria-label="Close settings">
               <X size={20} />
