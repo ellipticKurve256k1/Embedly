@@ -16,7 +16,6 @@ import {
 import ChatInput from './ChatInput.jsx';
 import ChatSidebar from './ChatSidebar.jsx';
 import MessageList from './MessageList.jsx';
-import DatasetScopeControl from './DatasetScopeControl.jsx';
 import SourcesPanel from './SourcesPanel.jsx';
 import SetupRequiredNotice from './SetupRequiredNotice.jsx';
 import './ChatPanel.css';
@@ -488,16 +487,6 @@ export default function ChatPanel({
 
   const chatContent = settingsReady ? (
     <>
-      <div className="chat-panel__scope">
-        <DatasetScopeControl
-          projects={projects}
-          value={selectedProjectId}
-          label="Dataset Scope"
-          contextLabel="Retrieving from"
-          flashKey={scopeFlashKey}
-          onChange={onProjectChange}
-        />
-      </div>
       <MessageList messages={messages} isSearching={isSearching} />
       {chatError && (
         <div className="chat-panel__error" role="alert">
@@ -547,7 +536,11 @@ export default function ChatPanel({
             wasRewritten={wasRewritten}
             project={selectedProject}
             projectName={selectedProject?.name ?? 'All Documents'}
+            projects={projects}
+            selectedProjectId={selectedProjectId}
+            scopeFlashKey={scopeFlashKey}
             status={contextStatus}
+            onProjectChange={onProjectChange}
             onClose={() => setSourcesCollapsed(!sourcesCollapsed)}
           />
         )}

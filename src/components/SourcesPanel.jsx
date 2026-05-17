@@ -1,5 +1,6 @@
 import { FileText, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import ProjectChip from './ProjectChip.jsx';
+import ScopeToggle from './ScopeToggle.jsx';
 import './SourcesPanel.css';
 
 function formatScore(score) {
@@ -21,7 +22,11 @@ export default function SourcesPanel({
   wasRewritten,
   project,
   projectName,
+  projects = [],
+  selectedProjectId = null,
+  scopeFlashKey,
   status,
+  onProjectChange,
   onClose,
 }) {
   const citedSet = new Set(citedIndices);
@@ -38,14 +43,24 @@ export default function SourcesPanel({
               </span>
               <h2>Retrieved chunks</h2>
             </div>
-            <button
-              className="sources-panel__toggle"
-              type="button"
-              aria-label="Close context panel"
-              onClick={onClose}
-            >
-              <PanelRightClose size={18} />
-            </button>
+            <div className="sources-panel__header-actions">
+              <ScopeToggle
+                projects={projects}
+                value={selectedProjectId}
+                variant="compact"
+                className="sources-panel__scope-toggle"
+                flashKey={scopeFlashKey}
+                onChange={onProjectChange}
+              />
+              <button
+                className="sources-panel__toggle"
+                type="button"
+                aria-label="Close context panel"
+                onClick={onClose}
+              >
+                <PanelRightClose size={18} />
+              </button>
+            </div>
           </header>
 
           {status && (

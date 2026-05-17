@@ -23,13 +23,6 @@
   flex-direction: column;
 }
 
-.chat-panel__scope {
-  width: var(--chat-content-width);
-  margin: 0 auto 14px;
-  display: grid;
-  padding: 0 clamp(0px, 2vw, 20px);
-}
-
 .chat-panel__footer {
   flex: 0 0 auto;
   display: flex;
@@ -131,11 +124,6 @@
 @media (max-width: 680px) {
   .chat-panel__conversation {
     padding-left: 44px;
-  }
-
-  .chat-panel__scope {
-    width: 100%;
-    padding: 0 0 8px;
   }
 
   .chat-panel__footer {

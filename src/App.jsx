@@ -19,7 +19,7 @@ import SearchResults from './components/SearchResults';
 import ChatPanel from './components/ChatPanel';
 import LoginButton from './components/LoginButton';
 import SetupRequiredNotice from './components/SetupRequiredNotice';
-import DatasetScopeControl from './components/DatasetScopeControl';
+import ScopeToggle from './components/ScopeToggle';
 
 function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
   const missingSettings = [];
@@ -292,10 +292,11 @@ export default function App() {
                   </div>
                 )}
 
-                <label className="search-box">
+                <div className="search-box">
                   <Search size={20} />
                   <input
                     type="search"
+                    aria-label="Search your knowledge base"
                     placeholder="Search your knowledge base..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -305,21 +306,13 @@ export default function App() {
                   {isSearching && (
                     <LoaderCircle size={20} className="search-spinner" />
                   )}
-                </label>
-
-                <div className="search-scope-row">
-                  <DatasetScopeControl
-                    projects={projects}
-                    value={selectedProjectId}
-                    label="Dataset Scope"
-                    contextLabel="Dataset"
-                    flashKey={scopeNotice?.id}
-                    onChange={handleProjectChange}
-                  />
-                  {scopeNotice && (
-                    <div className="scope-feedback" role="status">
-                      {scopeNotice.message}
-                    </div>
+                  {!hasResults && (
+                    <ScopeToggle
+                      projects={projects}
+                      value={selectedProjectId}
+                      flashKey={scopeNotice?.id}
+                      onChange={handleProjectChange}
+                    />
                   )}
                 </div>
 
@@ -336,6 +329,8 @@ export default function App() {
                     selectedResult={selectedResult}
                     projects={projects}
                     selectedProjectId={selectedProjectId}
+                    scopeFlashKey={scopeNotice?.id}
+                    isSearching={isSearching}
                     onProjectChange={handleProjectChange}
                     onSelectResult={handleSelectResult}
                     onClosePreview={handleClosePanel}
@@ -359,6 +354,12 @@ export default function App() {
           <UploadBox
             projects={projects}
           />
+        )}
+
+        {scopeNotice && (
+          <div className="scope-feedback" role="status">
+            {scopeNotice.message}
+          </div>
         )}
       </section>
     </main>

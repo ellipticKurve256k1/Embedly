@@ -102,7 +102,8 @@ Component interiors generally use 10-18px gaps and padding. Dense operational vi
 | `.search-box` | Pill input | 999px | Large glass search control |
 | `.model-card` | Selectable card | 14px | Radio row, selected accent border |
 | `.configured-model-card` | Summary card | 14px | Provider icon, model text, change action |
-| `.dataset-scope-control` | Scope strip | 14px | Elevated chat/search dataset boundary with dropdown and project count |
+| `.dataset-scope-control` | Scope strip | 14px | Full-width dataset boundary for settings or large project-selection surfaces |
+| `.scope-toggle` | Scope toggle | 10-11px | Standout compact chat/search dataset dropdown with side-aligned menu, scope label, and accent rail |
 | `.project-chip` | Project token | 8-14px | Deterministic color initials, project name, count, all-documents and unassigned states |
 | `.project-selector` | Compact selector | 12px | Native select for upload assignment controls |
 | `.setup-message` | Inline banner | 14px | Info, warning, error, or success state |
@@ -167,7 +168,7 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 | Component | Description |
 |-----------|-------------|
 | `ChatPanel` | Main chat container with conversation sidebar, message area, sources panel, and footer input. |
-| `DatasetScopeControl` | Full-width retrieval boundary selector above the chat transcript. |
+| `ScopeToggle` | Standout compact retrieval scope selector in the sources panel header. |
 | `ChatSidebar` | Collapsible conversation history rail with new-chat, rename, delete, and count controls. |
 | `ChatSessionItem` | Conversation row or icon-only collapsed item with active and rename states. |
 | `ChatInput` | Text input and send action for user prompts. |
@@ -181,7 +182,7 @@ Stable dimensions are preferred for repeated rows, icon controls, badges, and st
 Visual rules:
 
 - Chat uses a glass panel aligned to the application shell.
-- The dataset scope control sits between the panel chrome and messages so the active retrieval boundary is always visible.
+- The compact scope toggle lives in the sources panel header so retrieval scope is controlled where retrieved context appears without taking message-list space.
 - When scope changes during a conversation, a small system row records the new retrieval scope.
 - The conversation sidebar is 260px when expanded and a 44px icon rail when collapsed.
 - Collapsed sidebar items expose titles through hover tooltips and keep the active conversation visibly highlighted.
@@ -269,7 +270,7 @@ Visual rules:
 | Component | Description |
 |-----------|-------------|
 | `SearchResults` | Coordinates result list, selected state, detail panel, and map. |
-| `DatasetScopeControl` | Scope selector placed directly below the search input before results. |
+| `ScopeToggle` | Standout compact scope selector inside the empty search input and in the result header when results are visible. |
 | `ProjectChip` | Header project identity and unscoped per-result initials tile. |
 | `ResultPanel` | Detail preview for a selected search result. |
 | `OntologyMap` | Interactive node-link visualization for search result relationships. |
@@ -278,6 +279,7 @@ Visual rules:
 
 - Result cards show document name, chunk preview, and relevance score.
 - Result headers read as scoped output, for example "8 results from React Docs" or "8 results from All Documents."
+- The search page avoids a full-width scope strip; the compact toggle uses a visible `Scope` label, accent rail, and side-aligned dropdown while staying secondary to the query and result content.
 - Unscoped search shows per-result project initials tiles; scoped search suppresses redundant row project badges.
 - Reranked chat sources show both embedding and rerank scores so users can tell when the second stage affected ordering.
 - Selected result state should be obvious without overpowering the map.

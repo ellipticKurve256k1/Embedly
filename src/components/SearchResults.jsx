@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { FileText, Award, CircleDot, Hash } from 'lucide-react';
 import ProjectChip from './ProjectChip.jsx';
+import ScopeToggle from './ScopeToggle.jsx';
 import './SearchResults.css';
 
 function formatScore(score) {
@@ -19,6 +20,8 @@ export default function SearchResults({
   selectedResult,
   projects = [],
   selectedProjectId = null,
+  scopeFlashKey,
+  isSearching = false,
   onProjectChange,
   onSelectResult,
   onClosePreview,
@@ -44,22 +47,34 @@ export default function SearchResults({
   }
 
   return (
-    <div className="search-results">
+    <div className={`search-results${isSearching ? ' is-refreshing' : ''}`}>
       {/* Left: Result List */}
       <div className="result-list">
         <header className="result-list-header">
-          <div className="result-list-title">
-            <span>
-              {results.length} result{results.length !== 1 ? 's' : ''} from
-            </span>
-            {selectedProject ? (
-              <ProjectChip project={selectedProject} variant="compact" showCount />
-            ) : (
-              <ProjectChip label="All Documents" variant="compact" />
-            )}
+          <div className="result-list-header__text">
+            <div className="result-list-title">
+              <span>
+                {results.length} result{results.length !== 1 ? 's' : ''} from
+              </span>
+              {selectedProject ? (
+                <ProjectChip project={selectedProject} variant="compact" showCount />
+              ) : (
+                <ProjectChip label="All Documents" variant="compact" />
+              )}
+            </div>
+            <div className="result-list-query" title={query}>
+              &ldquo;{query}&rdquo;
+            </div>
           </div>
-          <div className="result-list-query" title={query}>
-            &ldquo;{query}&rdquo;
+          <div className="result-list-header__toggle">
+            <ScopeToggle
+              projects={projects}
+              value={selectedProjectId}
+              variant="compact"
+              className="result-list-scope-toggle"
+              flashKey={scopeFlashKey}
+              onChange={onProjectChange}
+            />
           </div>
         </header>
 

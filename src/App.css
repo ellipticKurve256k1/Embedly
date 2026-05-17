@@ -69,10 +69,11 @@
   width: min(68vw, 760px);
   min-width: min(100%, 360px);
   min-height: clamp(64px, 8vh, 78px);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 18px;
-  padding: 0 34px;
+  padding: 0 14px 0 34px;
   border: 1px solid rgba(126, 137, 170, 0.2);
   border-radius: 999px;
   color: #8c96ad;
@@ -104,17 +105,7 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
-.search-scope-row {
-  position: relative;
-  z-index: 2;
-  width: min(68vw, 760px);
-  min-width: min(100%, 360px);
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.search-box svg {
+.search-box > svg {
   width: 28px;
   height: 28px;
   fill: none;
@@ -125,7 +116,7 @@
   flex: 0 0 auto;
 }
 
-.has-results .search-box svg {
+.has-results .search-box > svg {
   width: 24px;
   height: 24px;
 }
@@ -140,6 +131,19 @@
   font: inherit;
   font-size: clamp(17px, 2vw, 20px);
   font-weight: 500;
+}
+
+.search-box:focus-within .scope-toggle {
+  opacity: 0.72;
+}
+
+.search-box .scope-toggle:hover,
+.search-box .scope-toggle.is-open {
+  opacity: 1;
+}
+
+.search-box .scope-toggle__label {
+  max-width: 150px;
 }
 
 .search-box input::placeholder {
@@ -241,7 +245,7 @@
     min-width: 0;
     min-height: 60px;
     gap: 14px;
-    padding: 0 20px;
+    padding: 0 10px 0 20px;
   }
 
   .has-results .search-box {
@@ -249,24 +253,31 @@
     min-height: 54px;
   }
 
-  .search-box svg {
+  .search-box > svg {
     width: 24px;
     height: 24px;
+  }
+
+  .search-box .scope-toggle__label {
+    max-width: 92px;
+  }
+
+  .search-box .scope-toggle__trigger {
+    padding-right: 9px;
   }
 
   .search-error {
     width: calc(100% - 24px);
     min-width: 0;
   }
-
-  .search-scope-row {
-    width: calc(100% - 24px);
-    min-width: 0;
-  }
 }
 
 .scope-feedback {
-  justify-self: start;
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 60;
+  transform: translateX(-50%);
   min-height: 28px;
   display: inline-flex;
   align-items: center;

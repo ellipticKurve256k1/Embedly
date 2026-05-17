@@ -85,13 +85,13 @@ App
     ModelStatusBar
     LoginButton
     ChatPanel (mode: chat)
-      DatasetScopeControl
       ChatSidebar
         ChatSessionItem
       MessageList
       SourceChip
       SourceList
       SourcesPanel
+        ScopeToggle
       ChatInput
     UploadBox (mode: upload)
       FileDropZone
@@ -102,7 +102,7 @@ App
       TransferPane (knowledge base)
       EmbedActionBar
     SearchResults (mode: search after query)
-      DatasetScopeControl
+      ScopeToggle
       OntologyMap
       ResultPanel
 ```
@@ -293,7 +293,8 @@ User clicks Connect Wallet
 | `SourceList` | `src/components/SourceList.jsx` | Collapsible source summary below assistant messages. |
 | `SourceItem` | `src/components/SourceItem.jsx` | Individual source row with cited state and document action. |
 | `ChatInput` | `src/components/ChatInput.jsx` | Collects and submits chat prompts. |
-| `DatasetScopeControl` | `src/components/DatasetScopeControl.jsx` | Prominent chat/search scope selector with project identity, counts, and settings link. |
+| `DatasetScopeControl` | `src/components/DatasetScopeControl.jsx` | Full-width scope selector kept for large project-selection surfaces. |
+| `ScopeToggle` | `src/components/ScopeToggle.jsx` | Standout compact chat/search scope dropdown with project identity, scope label, side-aligned menu, settings link, and micro/compact/inline variants. |
 | `ProjectChip` | `src/components/ProjectChip.jsx` | Reusable project identity token with deterministic initials color, counts, all-documents, and unassigned states. |
 | `ProjectSelector` | `src/components/ProjectSelector.jsx` | Compact native dropdown for upload assignment controls. |
 | `UploadBox` | `src/components/UploadBox.jsx` | Owns upload, transfer, selection, and job polling state. |
