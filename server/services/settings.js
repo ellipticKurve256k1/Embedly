@@ -84,7 +84,10 @@ function shouldEncryptSetting(value) {
     value
       && typeof value === 'object'
       && !Array.isArray(value)
-      && Object.prototype.hasOwnProperty.call(value, 'apiKey'),
+      && (
+        Object.prototype.hasOwnProperty.call(value, 'apiKey')
+        || Object.prototype.hasOwnProperty.call(value, 'serviceRoleKey')
+      ),
   );
 }
 
@@ -123,20 +126,33 @@ function toPublicSetting(publicKey, value) {
     return value;
   }
 
-  if (publicKey !== 'llm') {
-    return value;
+  if (publicKey === 'llm') {
+    const apiKey = String(value.apiKey ?? '').trim();
+    if (!apiKey) {
+      return value;
+    }
+
+    return {
+      ...value,
+      apiKey: maskApiKey(apiKey),
+      hasApiKey: true,
+    };
   }
 
-  const apiKey = String(value.apiKey ?? '').trim();
-  if (!apiKey) {
-    return value;
+  if (publicKey === 'vectorDb' && value.provider === 'supabase') {
+    const serviceRoleKey = String(value.serviceRoleKey ?? '').trim();
+    if (!serviceRoleKey) {
+      return value;
+    }
+
+    return {
+      ...value,
+      serviceRoleKey: maskApiKey(serviceRoleKey),
+      hasServiceRoleKey: true,
+    };
   }
 
-  return {
-    ...value,
-    apiKey: maskApiKey(apiKey),
-    hasApiKey: true,
-  };
+  return value;
 }
 
 function normalizeLlmSetup(value, userId) {
@@ -173,6 +189,16 @@ function normalizeNumber(value, fallback, { min, max }) {
   return Math.max(min, Math.min(max, nextValue));
 }
 
+function normalizeFloat(value, fallback, { min, max }) {
+  const nextValue = Number(value);
+
+  if (!Number.isFinite(nextValue)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, nextValue));
+}
+
 function normalizeRerankerSetup(value) {
   const input = value && typeof value === 'object' ? value : {};
   const topK = normalizeNumber(input.topK, DEFAULT_RERANKER_CONFIG.topK, { min: 1, max: 20 });
@@ -192,6 +218,34 @@ function normalizeRerankerSetup(value) {
   };
 }
 
+function normalizeVectorDbSetup(value, userId) {
+  const input = value && typeof value === 'object' ? value : {};
+  const provider = input.provider === 'supabase' ? 'supabase' : 'sqlite';
+  const setup = {
+    provider,
+    name: provider === 'supabase' ? 'Supabase' : 'SQLite',
+  };
+
+  if (provider === 'supabase') {
+    const previousSetup = getVectorDbSetup(userId);
+    const nextServiceRoleKey = String(input.serviceRoleKey ?? '').trim();
+    const previousServiceRoleKey = String(previousSetup?.serviceRoleKey ?? '').trim();
+
+    setup.projectUrl = String(input.projectUrl ?? '').trim().replace(/\/+$/, '');
+    setup.table = String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks';
+    setup.dimensions = normalizeNumber(input.dimensions, 768, { min: 1, max: 4096 });
+    setup.matchThreshold = normalizeFloat(input.matchThreshold, 0, { min: 0, max: 1 });
+
+    if (nextServiceRoleKey && !isMaskedApiKey(nextServiceRoleKey)) {
+      setup.serviceRoleKey = nextServiceRoleKey;
+    } else if (previousServiceRoleKey) {
+      setup.serviceRoleKey = previousServiceRoleKey;
+    }
+  }
+
+  return setup;
+}
+
 function normalizeSetting(publicKey, value, userId) {
   if (publicKey === 'llm') {
     return normalizeLlmSetup(value, userId);
@@ -199,6 +253,10 @@ function normalizeSetting(publicKey, value, userId) {
 
   if (publicKey === 'reranker') {
     return normalizeRerankerSetup(value);
+  }
+
+  if (publicKey === 'vectorDb') {
+    return normalizeVectorDbSetup(value, userId);
   }
 
   return value;
@@ -330,6 +388,10 @@ export function getEmbeddingSetup(userId) {
 
 export function getChunkingConfig(userId) {
   return getSetting(SETTINGS_KEYS.chunking, userId);
+}
+
+export function getVectorDbSetup(userId) {
+  return getSetting(SETTINGS_KEYS.vectorDb, userId);
 }
 
 export function getRerankerSetup(userId) {

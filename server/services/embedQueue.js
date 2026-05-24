@@ -8,8 +8,10 @@ import {
   updateDocumentStatus,
 } from '../db.js';
 import { chunkText } from './chunker.js';
-import { DEFAULT_EMBEDDING_MODEL, embedText, vectorToBlob } from './embedder.js';
+import { DEFAULT_EMBEDDING_MODEL, embedText } from './embedder.js';
 import { parseFile } from './parser.js';
+import { getVectorDbSetup } from './settings.js';
+import { createVectorStore } from './vectorStores/index.js';
 
 const ACTIVE_JOB_STATUSES = new Set(['pending', 'running']);
 const ACTIVE_DOCUMENT_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
@@ -126,10 +128,10 @@ class EmbedQueue {
       throw error;
     }
 
-    return documents.map((document) => this.enqueueDocument(document, options));
+    return Promise.all(documents.map((document) => this.enqueueDocument(document, options)));
   }
 
-  enqueueDocument(document, options = {}) {
+  async enqueueDocument(document, options = {}) {
     const existingQueuedJob = this.queue.find((queuedJob) => queuedJob.documentId === document.id);
 
     if (existingQueuedJob) {
@@ -159,8 +161,11 @@ class EmbedQueue {
     const model = String(options.model || DEFAULT_EMBEDDING_MODEL).trim() || DEFAULT_EMBEDDING_MODEL;
     const jobId = uuidv4();
     const createdAt = nowIso();
+    const vectorDbSetup = getVectorDbSetup(options.userId);
+    const vectorStore = createVectorStore(vectorDbSetup);
 
     clearDocumentIndex(document.id);
+    await vectorStore.clearDocumentIndex(document.id);
     updateDocumentStatus(document.id, 'embedding');
 
     db.prepare(`
@@ -175,6 +180,7 @@ class EmbedQueue {
       documentId: document.id,
       chunking: options.chunking,
       model,
+      vectorDbSetup,
     };
 
     this.queue.push(queuedJob);
@@ -209,7 +215,14 @@ class EmbedQueue {
   }
 
   async processJob(job) {
-    const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(job.documentId);
+    const document = db.prepare(`
+      SELECT
+        documents.*,
+        projects.name AS project_name
+      FROM documents
+      LEFT JOIN projects ON projects.id = documents.project_id
+      WHERE documents.id = ?
+    `).get(job.documentId);
 
     if (!document) {
       throw new Error('Document was deleted before embedding started.');
@@ -248,24 +261,27 @@ class EmbedQueue {
         INSERT INTO chunks (id, document_id, idx, content, token_count, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      const insertEmbedding = db.prepare(`
-        INSERT INTO embeddings (id, chunk_id, vector, model, dimensions, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
+      const vectorStore = createVectorStore(job.vectorDbSetup);
+      const indexedDocument = {
+        ...document,
+        chunk_count: chunks.length,
+      };
 
       for (const chunk of chunks) {
         const chunkId = uuidv4();
         insertChunk.run(chunkId, document.id, chunk.idx, chunk.content, chunk.tokenCount, nowIso());
 
+        const indexedChunk = {
+          ...chunk,
+          id: chunkId,
+        };
         const vector = await embedText(chunk.content, job.model);
-        insertEmbedding.run(
-          uuidv4(),
-          chunkId,
-          vectorToBlob(vector),
-          job.model,
-          vector.length,
-          nowIso(),
-        );
+        await vectorStore.indexChunk({
+          document: indexedDocument,
+          chunk: indexedChunk,
+          vector,
+          model: job.model,
+        });
 
         this.updateJob(job.id, { processedChunks: chunk.idx + 1 });
         this.broadcast({ type: 'progress', job: toPublicJob(getJobRow(job.id)) });

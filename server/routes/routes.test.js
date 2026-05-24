@@ -7,6 +7,7 @@ import embedRouter from './embed.js';
 import projectsRouter from './projects.js';
 import searchRouter from './search.js';
 import settingsRouter from './settings.js';
+import vectorDbRouter from './vectorDb.js';
 import { deleteSetting, SETTINGS_KEYS } from '../services/settings.js';
 import { dispatchExpress } from '../test-helpers.js';
 
@@ -21,6 +22,7 @@ function createApp() {
   app.use('/api/projects', projectsRouter);
   app.use('/api/search', searchRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/vector-db', vectorDbRouter);
   return app;
 }
 
@@ -206,7 +208,7 @@ test('GET /api/settings/:key returns one public setting', async () => {
     body: { vectorDb: { provider: 'sqlite' } },
   });
   const response = await dispatchExpress(app, { path: '/api/settings/vectorDb' });
-  assert.deepEqual(response.body, { vectorDb: { provider: 'sqlite' } });
+  assert.deepEqual(response.body, { vectorDb: { provider: 'sqlite', name: 'SQLite' } });
 });
 
 test('GET /api/settings/:key rejects unknown setting', async () => {
@@ -226,4 +228,26 @@ test('DELETE /api/settings/:key deletes known setting', async () => {
     path: '/api/settings/chunking',
   });
   assert.equal(response.status, 204);
+});
+
+test('POST /api/vector-db/test-connection accepts SQLite provider', async () => {
+  const response = await dispatchExpress(createApp(), {
+    method: 'POST',
+    path: '/api/vector-db/test-connection',
+    body: { provider: 'sqlite' },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.ok, true);
+});
+
+test('POST /api/vector-db/test-connection rejects incomplete Supabase setup', async () => {
+  const response = await dispatchExpress(createApp(), {
+    method: 'POST',
+    path: '/api/vector-db/test-connection',
+    body: { provider: 'supabase', projectUrl: 'https://test.supabase.co' },
+  });
+
+  assert.equal(response.status, 400);
+  assert.match(response.body.error, /service role key/i);
 });

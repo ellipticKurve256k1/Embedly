@@ -1,11 +1,11 @@
 import { db } from '../db.js';
 import {
-  blobToVector,
-  cosineSimilarity,
   DEFAULT_EMBEDDING_MODEL,
   embedText,
 } from './embedder.js';
 import { isRerankerEnabled, rerankDocuments } from './reranker.js';
+import { getVectorStore } from './vectorStores/index.js';
+import { toPublicVectorChunk } from './vectorStores/publicChunk.js';
 
 export const DEFAULT_RETRIEVAL_LIMIT = 5;
 export const DEFAULT_CANDIDATE_LIMIT = 20;
@@ -21,24 +21,7 @@ function normalizeLimit(value, fallback, { min = 1, max = 100 } = {}) {
 }
 
 export function toPublicChunk(row, score) {
-  return {
-    chunkId: row.chunk_id,
-    chunkIndex: row.chunk_index,
-    content: row.content,
-    documentId: row.document_id,
-    documentName: row.document_name,
-    documentType: row.document_type,
-    documentSize: row.document_size,
-    projectId: row.project_id ?? null,
-    projectName: row.project_name ?? null,
-    uploadedAt: row.uploaded_at,
-    totalChunks: row.total_chunks,
-    tokenCount: row.token_count,
-    embeddingModel: row.embedding_model,
-    previousChunk: null,
-    nextChunk: null,
-    score,
-  };
+  return toPublicVectorChunk(row, score);
 }
 
 export function toContextChunk(chunk) {
@@ -106,6 +89,7 @@ export async function retrieveChunks(query, {
   topK,
   reranker = null,
   projectId = null,
+  userId = null,
 } = {}) {
   const trimmedQuery = String(query ?? '').trim();
   const normalizedProjectId = String(projectId ?? '').trim() || null;
@@ -123,36 +107,13 @@ export async function retrieveChunks(query, {
     )
     : finalLimit;
   const queryVector = Float32Array.from(await embedText(trimmedQuery, model));
-  const queryParams = normalizedProjectId ? [model, normalizedProjectId] : [model];
-  const rows = db.prepare(`
-    SELECT
-      embeddings.vector,
-      embeddings.model AS embedding_model,
-      chunks.id AS chunk_id,
-      chunks.idx AS chunk_index,
-      chunks.content,
-      chunks.token_count,
-      documents.id AS document_id,
-      documents.filename AS document_name,
-      documents.mime_type AS document_type,
-      documents.size_bytes AS document_size,
-      documents.project_id,
-      projects.name AS project_name,
-      documents.created_at AS uploaded_at,
-      documents.chunk_count AS total_chunks
-    FROM embeddings
-    JOIN chunks ON chunks.id = embeddings.chunk_id
-    JOIN documents ON documents.id = chunks.document_id
-    LEFT JOIN projects ON projects.id = documents.project_id
-    WHERE embeddings.model = ?
-      ${normalizedProjectId ? 'AND documents.project_id = ?' : ''}
-  `).all(...queryParams);
-
-  const candidates = rows
-    .map((row) => toPublicChunk(row, cosineSimilarity(queryVector, blobToVector(row.vector))))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, finalCandidateLimit)
-    .map(withAdjacentContext);
+  const vectorStore = getVectorStore(userId);
+  const candidates = (await vectorStore.retrieveChunks({
+    queryVector,
+    model,
+    projectId: normalizedProjectId,
+    limit: finalCandidateLimit,
+  })).map(withAdjacentContext);
 
   if (!shouldRerank) {
     return candidates.slice(0, finalLimit);

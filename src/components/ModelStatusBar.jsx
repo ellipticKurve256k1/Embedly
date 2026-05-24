@@ -14,6 +14,10 @@ function formatProviderName(provider) {
     return 'SQLite';
   }
 
+  if (provider === 'supabase') {
+    return 'Supabase';
+  }
+
   return provider;
 }
 

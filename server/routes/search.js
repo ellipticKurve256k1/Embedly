@@ -28,6 +28,7 @@ router.get('/', async (request, response) => {
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
     projectId,
+    userId: request.userId,
   });
   const rerankerUsed = results.some((result) => typeof result.rerankScore === 'number');
 

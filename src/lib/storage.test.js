@@ -9,6 +9,7 @@ import {
   loadSettings,
   normalizeChunkingConfig,
   normalizeRerankerSetup,
+  normalizeVectorDbSetup,
   readSavedChunkingConfig,
   readSavedEmbeddingSetup,
   readSavedRerankerSetup,
@@ -17,6 +18,7 @@ import {
   saveEmbeddingSetup,
   saveRetrievalSettings,
   saveSettings,
+  testVectorDbConnection,
 } from './storage.js';
 
 const originalFetch = global.fetch;
@@ -98,6 +100,34 @@ test('readSavedVectorDbSetup returns default when unset', () => {
   assert.deepEqual(readSavedVectorDbSetup(), { provider: 'sqlite', name: 'SQLite' });
 });
 
+test('normalizeVectorDbSetup returns SQLite default for unknown provider', () => {
+  assert.deepEqual(normalizeVectorDbSetup({ provider: 'other' }), {
+    provider: 'sqlite',
+    name: 'SQLite',
+  });
+});
+
+test('normalizeVectorDbSetup normalizes Supabase fields', () => {
+  assert.deepEqual(normalizeVectorDbSetup({
+    provider: 'supabase',
+    projectUrl: 'https://test.supabase.co/',
+    serviceRoleKey: 'secret',
+    table: '',
+    dimensions: 99999,
+    matchThreshold: -1,
+    hasServiceRoleKey: true,
+  }), {
+    provider: 'supabase',
+    name: 'Supabase',
+    projectUrl: 'https://test.supabase.co',
+    serviceRoleKey: 'secret',
+    table: 'embeddly_chunks',
+    dimensions: 4096,
+    matchThreshold: 0,
+    hasServiceRoleKey: true,
+  });
+});
+
 test('loadSettings updates cached settings', async () => {
   global.fetch = async () => jsonResponse({ embedding: { model: 'nomic' } });
   await loadSettings();
@@ -113,6 +143,19 @@ test('saveSettings posts settings and updates cache', async () => {
 
   await saveSettings({ embedding: { model: 'nomic' } });
   assert.deepEqual(readSavedEmbeddingSetup(), { model: 'nomic' });
+});
+
+test('testVectorDbConnection posts normalized setup', async () => {
+  global.fetch = async (url, options) => {
+    assert.match(url, /\/api\/vector-db\/test-connection$/);
+    assert.equal(options.method, 'POST');
+    const body = JSON.parse(options.body);
+    assert.equal(body.provider, 'supabase');
+    assert.equal(body.table, 'embeddly_chunks');
+    return jsonResponse({ ok: true });
+  };
+
+  assert.deepEqual(await testVectorDbConnection({ provider: 'supabase' }), { ok: true });
 });
 
 test('saveEmbeddingSetup returns saved embedding setting', async () => {

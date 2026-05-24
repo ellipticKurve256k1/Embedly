@@ -11,6 +11,7 @@ import projectsRouter from './routes/projects.js';
 import searchRouter from './routes/search.js';
 import settingsRouter from './routes/settings.js';
 import uploadRouter from './routes/upload.js';
+import vectorDbRouter from './routes/vectorDb.js';
 import { initializeReranker } from './services/reranker.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -33,6 +34,7 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/vector-db', vectorDbRouter);
 
 app.use((error, _request, response, _next) => {
   const status = error.statusCode || error.status || 500;

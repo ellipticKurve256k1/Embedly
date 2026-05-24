@@ -33,6 +33,7 @@ import {
   saveLlmSetup,
   saveRetrievalSettings,
   saveVectorDbSetup,
+  testVectorDbConnection,
 } from '../lib/storage.js';
 import LoginButton from './LoginButton';
 import EmbeddingIndicator from './EmbeddingIndicator';
@@ -91,6 +92,14 @@ const vectorDbProviders = [
     icon: Database,
     component: SQLiteVectorDbSetup,
   },
+  {
+    id: 'supabase',
+    name: 'Supabase',
+    mode: 'Remote',
+    summary: 'Use Supabase pgvector for remote vector storage and similarity search.',
+    icon: Zap,
+    component: SupabaseVectorDbSetup,
+  },
 ];
 
 function normalizeEndpointInput(endpoint) {
@@ -104,6 +113,17 @@ function isValidApiEndpoint(endpoint) {
     const url = new URL(normalizedEndpoint);
     return (url.protocol === 'http:' || url.protocol === 'https:')
       && (url.pathname === '' || url.pathname === '/' || url.pathname.endsWith('/v1'));
+  } catch {
+    return false;
+  }
+}
+
+function isValidHttpUrl(value) {
+  const normalizedValue = String(value ?? '').trim();
+
+  try {
+    const url = new URL(normalizedValue);
+    return url.protocol === 'http:' || url.protocol === 'https:';
   } catch {
     return false;
   }
@@ -164,6 +184,14 @@ export default function SettingsPage() {
   const [selectedVectorDbProvider, setSelectedVectorDbProvider] = useState(
     vectorDbSetup?.provider ?? vectorDbProviders[0].id,
   );
+  const [supabaseVectorDbFields, setSupabaseVectorDbFields] = useState({
+    projectUrl: vectorDbSetup?.projectUrl ?? '',
+    serviceRoleKey: vectorDbSetup?.serviceRoleKey ?? '',
+    table: vectorDbSetup?.table ?? 'embeddly_chunks',
+    dimensions: vectorDbSetup?.dimensions ?? 768,
+    matchThreshold: vectorDbSetup?.matchThreshold ?? 0,
+    hasServiceRoleKey: Boolean(vectorDbSetup?.hasServiceRoleKey),
+  });
   const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
   const [rerankerConfig, setRerankerConfig] = useState(readSavedRerankerSetup);
   const [projects, setProjects] = useState([]);
@@ -225,6 +253,14 @@ export default function SettingsPage() {
 
     setVectorDbSetup(nextVectorDbSetup);
     setSelectedVectorDbProvider(nextVectorDbSetup?.provider ?? vectorDbProviders[0].id);
+    setSupabaseVectorDbFields({
+      projectUrl: nextVectorDbSetup?.projectUrl ?? '',
+      serviceRoleKey: nextVectorDbSetup?.serviceRoleKey ?? '',
+      table: nextVectorDbSetup?.table ?? 'embeddly_chunks',
+      dimensions: nextVectorDbSetup?.dimensions ?? 768,
+      matchThreshold: nextVectorDbSetup?.matchThreshold ?? 0,
+      hasServiceRoleKey: Boolean(nextVectorDbSetup?.hasServiceRoleKey),
+    });
     setChunkingConfig(nextChunkingConfig);
     setRerankerConfig(nextRerankerConfig);
   }, []);
@@ -345,21 +381,67 @@ export default function SettingsPage() {
       return;
     }
 
+    setSelectedVectorDbProvider(providerId);
+
+    if (providerId === 'supabase') {
+      return;
+    }
+
     const nextSetup = {
       provider: selectedProviderConfig.id,
       name: selectedProviderConfig.name,
     };
 
-    setSelectedVectorDbProvider(providerId);
-
     const savedSetup = await saveWithStatus(
       'vector-db',
       () => saveVectorDbSetup(nextSetup),
-      'Vector database settings saved.',
+      'Vector database settings saved. Re-embed documents to build this index.',
     );
 
     if (savedSetup) {
       setVectorDbSetup(savedSetup);
+    }
+  };
+
+  const handleSaveVectorDbSetup = async () => {
+    const selectedProviderConfig = vectorDbProviders.find(
+      (provider) => provider.id === selectedVectorDbProvider,
+    );
+
+    if (!selectedProviderConfig) {
+      return;
+    }
+
+    const nextSetup = selectedVectorDbProvider === 'supabase'
+      ? {
+        provider: 'supabase',
+        name: 'Supabase',
+        ...supabaseVectorDbFields,
+      }
+      : {
+        provider: selectedProviderConfig.id,
+        name: selectedProviderConfig.name,
+      };
+
+    const savedSetup = await saveWithStatus(
+      'vector-db',
+      async () => {
+        await testVectorDbConnection(nextSetup);
+        return saveVectorDbSetup(nextSetup);
+      },
+      'Vector database settings saved. Re-embed documents to build this index.',
+    );
+
+    if (savedSetup) {
+      setVectorDbSetup(savedSetup);
+      setSupabaseVectorDbFields({
+        projectUrl: savedSetup.projectUrl ?? supabaseVectorDbFields.projectUrl,
+        serviceRoleKey: savedSetup.serviceRoleKey ?? '',
+        table: savedSetup.table ?? supabaseVectorDbFields.table,
+        dimensions: savedSetup.dimensions ?? supabaseVectorDbFields.dimensions,
+        matchThreshold: savedSetup.matchThreshold ?? supabaseVectorDbFields.matchThreshold,
+        hasServiceRoleKey: Boolean(savedSetup.hasServiceRoleKey),
+      });
     }
   };
 
@@ -575,8 +657,13 @@ export default function SettingsPage() {
               <VectorDbSettingsPanel
                 selectedProvider={selectedVectorDbProvider}
                 ActiveProviderSetup={ActiveVectorDbSetup}
+                vectorDbSetup={vectorDbSetup}
+                supabaseFields={supabaseVectorDbFields}
+                isSaving={savingSection === 'vector-db'}
                 saveStatus={getSaveStatus('vector-db', saveStatus)}
+                onSave={handleSaveVectorDbSetup}
                 onSelectProvider={handleSelectVectorDbProvider}
+                onSupabaseFieldsChange={setSupabaseVectorDbFields}
               />
             )}
 
@@ -1044,9 +1131,23 @@ function ProjectsSettingsPanel({
 function VectorDbSettingsPanel({
   selectedProvider,
   ActiveProviderSetup,
+  vectorDbSetup,
+  supabaseFields,
+  isSaving,
   saveStatus,
+  onSave,
   onSelectProvider,
+  onSupabaseFieldsChange,
 }) {
+  const canSave = selectedProvider === 'sqlite'
+    || (
+      isValidHttpUrl(supabaseFields.projectUrl)
+      && Boolean(String(supabaseFields.serviceRoleKey ?? '').trim() || supabaseFields.hasServiceRoleKey)
+      && Boolean(String(supabaseFields.table ?? '').trim())
+      && Number.isInteger(Number(supabaseFields.dimensions))
+      && Number(supabaseFields.dimensions) > 0
+    );
+
   return (
     <section className="settings-detail" aria-labelledby="vector-db-title">
       <div className="settings-detail-heading">
@@ -1065,7 +1166,19 @@ function VectorDbSettingsPanel({
         onSelectProvider={onSelectProvider}
       />
 
-      {ActiveProviderSetup && <ActiveProviderSetup />}
+      {ActiveProviderSetup && (
+        <ActiveProviderSetup
+          setup={vectorDbSetup}
+          fields={supabaseFields}
+          onFieldsChange={onSupabaseFieldsChange}
+        />
+      )}
+      <SaveSettingsButton
+        disabled={!canSave || isSaving}
+        isSaving={isSaving}
+        label={isSaving ? 'Saving...' : 'Save VectorDB settings'}
+        onClick={onSave}
+      />
       <SaveStatusMessage status={saveStatus} />
     </section>
   );
@@ -1476,8 +1589,149 @@ function SQLiteVectorDbSetup() {
         <Database size={18} />
         <span>
           SQLite is ready to use as the local VectorDB option.
-          <small>Additional providers can be added through the vectorDbProviders list.</small>
+          <small>Embeddings are stored in the local SQLite database and ranked in process.</small>
         </span>
+      </div>
+    </section>
+  );
+}
+
+function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
+  const [isWarningVisible, setIsWarningVisible] = useState(true);
+  const projectUrl = fields.projectUrl ?? '';
+  const serviceRoleKey = fields.serviceRoleKey ?? '';
+  const table = fields.table ?? 'embeddly_chunks';
+  const dimensions = fields.dimensions ?? 768;
+  const matchThreshold = fields.matchThreshold ?? 0;
+  const isProjectUrlValid = !projectUrl || isValidHttpUrl(projectUrl);
+
+  const updateField = (field, value) => {
+    onFieldsChange((currentFields) => ({
+      ...currentFields,
+      [field]: value,
+      ...(field === 'serviceRoleKey' ? { hasServiceRoleKey: Boolean(value) } : {}),
+    }));
+  };
+
+  return (
+    <section className="provider-setup" aria-label="Supabase vector database setup">
+      <div className="provider-setup-header">
+        <span>
+          <strong>Supabase pgvector</strong>
+          <small>Store vectors remotely and use an RPC function for similarity search.</small>
+        </span>
+      </div>
+
+      {isWarningVisible && (
+        <div className="setup-message is-warning">
+          <AlertTriangle size={18} />
+          <span>
+            Supabase privacy warning
+            <small>
+              Supabase mode sends chunk text and embeddings to the configured Supabase project.
+              The service role key is stored encrypted on the local server.
+            </small>
+          </span>
+          <button
+            className="setup-message-dismiss"
+            type="button"
+            aria-label="Dismiss privacy warning"
+            onClick={() => setIsWarningVisible(false)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <div className="setup-message">
+        <Database size={18} />
+        <span>
+          Apply the Supabase SQL schema before saving.
+          <small>
+            Use references/supabase-vector-schema.sql. The vector dimension must match the
+            embedding model output.
+          </small>
+        </span>
+      </div>
+
+      <div className="settings-field-grid">
+        <label className="settings-field">
+          <span>
+            <strong>Project URL</strong>
+            <small>Supabase project URL, such as https://project-ref.supabase.co.</small>
+          </span>
+          <input
+            type="url"
+            value={projectUrl}
+            placeholder="https://project-ref.supabase.co"
+            aria-invalid={!isProjectUrlValid}
+            onChange={(event) => updateField('projectUrl', event.target.value)}
+          />
+        </label>
+
+        {!isProjectUrlValid && (
+          <div className="setup-message is-error">
+            <AlertCircle size={18} />
+            <span>Project URL must be an http(s) URL.</span>
+          </div>
+        )}
+
+        <label className="settings-field">
+          <span>
+            <strong>Service role key</strong>
+            <small>Server-only key used to write vectors and call the match RPC.</small>
+          </span>
+          <input
+            type="password"
+            value={serviceRoleKey}
+            placeholder={fields.hasServiceRoleKey ? 'Saved encrypted key' : 'service_role key'}
+            autoComplete="off"
+            onChange={(event) => updateField('serviceRoleKey', event.target.value)}
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>
+            <strong>Table name</strong>
+            <small>Remote table that stores Embeddly chunks and embeddings.</small>
+          </span>
+          <input
+            type="text"
+            value={table}
+            placeholder="embeddly_chunks"
+            onChange={(event) => updateField('table', event.target.value)}
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>
+            <strong>Dimensions</strong>
+            <small>Must match both the embedding model and Supabase VECTOR dimension.</small>
+          </span>
+          <input
+            min="1"
+            max="4096"
+            step="1"
+            type="number"
+            value={dimensions}
+            onChange={(event) => updateField('dimensions', Number(event.target.value))}
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>
+            <strong>Match threshold</strong>
+            <small>Minimum cosine similarity returned by the RPC search function.</small>
+          </span>
+          <input
+            min="0"
+            max="1"
+            step="0.01"
+            type="number"
+            value={matchThreshold}
+            onChange={(event) => updateField('matchThreshold', Number(event.target.value))}
+          />
+        </label>
       </div>
     </section>
   );

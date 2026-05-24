@@ -156,6 +156,7 @@ router.post('/', async (request, response) => {
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
     projectId,
+    userId: request.userId,
   };
 
   response.setHeader('Content-Type', 'text/event-stream');

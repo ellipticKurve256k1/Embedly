@@ -8,6 +8,7 @@ import {
   toPublicDocument,
   updateDocumentProject,
 } from '../db.js';
+import { getVectorStore } from '../services/vectorStores/index.js';
 
 const router = express.Router();
 
@@ -83,6 +84,15 @@ router.delete('/:id', async (request, response) => {
 
   if (!document) {
     response.status(404).json({ error: 'Document not found.' });
+    return;
+  }
+
+  try {
+    await getVectorStore(request.userId).clearDocumentIndex(document.id);
+  } catch (error) {
+    response.status(500).json({
+      error: error instanceof Error ? error.message : 'Unable to clear vector index.',
+    });
     return;
   }
 

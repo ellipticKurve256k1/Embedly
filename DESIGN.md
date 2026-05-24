@@ -28,6 +28,10 @@ Chat and search modes show a setup-required glass notice instead of their primar
 
 Retrieval settings include optional reranking controls. When enabled, users can choose the local cross-encoder model, candidate count, and final result count from the same Retrieval settings surface. Project selectors in chat and search scope retrieval to a named dataset while preserving All Documents as the default.
 
+VectorDB settings support SQLite and Supabase provider cards. Supabase setup uses the same quiet
+settings form language as external API setup: a warning banner, encrypted key copy, table/dimension
+fields, and a save action that validates connectivity before switching providers.
+
 ## 2. Color Palette
 
 | Role | Value | Usage |

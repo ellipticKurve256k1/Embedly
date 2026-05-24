@@ -9,6 +9,7 @@ import {
   getPublicSetting,
   getRerankerSetup,
   getSetting,
+  getVectorDbSetup,
   isMaskedApiKey,
   maskApiKey,
   savePublicSettings,
@@ -46,6 +47,19 @@ test('setSetting encrypts values that contain apiKey', () => {
   assert.equal(row.encrypted, 1);
   assert.doesNotMatch(row.value, /sk-secret/);
   assert.equal(getSetting(SETTINGS_KEYS.llm).apiKey, 'sk-secret');
+});
+
+test('setSetting encrypts values that contain serviceRoleKey', () => {
+  setSetting(SETTINGS_KEYS.vectorDb, {
+    provider: 'supabase',
+    projectUrl: 'https://test.supabase.co',
+    serviceRoleKey: 'supabase-secret',
+  });
+  const row = db.prepare('SELECT value, encrypted FROM settings WHERE key = ?')
+    .get(SETTINGS_KEYS.vectorDb);
+  assert.equal(row.encrypted, 1);
+  assert.doesNotMatch(row.value, /supabase-secret/);
+  assert.equal(getSetting(SETTINGS_KEYS.vectorDb).serviceRoleKey, 'supabase-secret');
 });
 
 test('maskApiKey masks middle portion of long keys', () => {
@@ -90,6 +104,56 @@ test('savePublicSettings persists normalized reranker settings', () => {
     topK: 20,
   });
   assert.deepEqual(getRerankerSetup(), result.reranker);
+});
+
+test('savePublicSettings normalizes SQLite vector DB settings', () => {
+  const result = savePublicSettings({ vectorDb: { provider: 'unknown', name: 'Other' } });
+  assert.deepEqual(result.vectorDb, { provider: 'sqlite', name: 'SQLite' });
+  assert.deepEqual(getVectorDbSetup(), { provider: 'sqlite', name: 'SQLite' });
+});
+
+test('savePublicSettings normalizes and masks Supabase vector DB settings', () => {
+  const result = savePublicSettings({
+    vectorDb: {
+      provider: 'supabase',
+      projectUrl: 'https://test.supabase.co/',
+      serviceRoleKey: 'service-role-secret',
+      table: '',
+      dimensions: 99999,
+      matchThreshold: 2,
+    },
+  });
+
+  assert.equal(result.vectorDb.provider, 'supabase');
+  assert.equal(result.vectorDb.projectUrl, 'https://test.supabase.co');
+  assert.equal(result.vectorDb.table, 'embeddly_chunks');
+  assert.equal(result.vectorDb.dimensions, 4096);
+  assert.equal(result.vectorDb.matchThreshold, 1);
+  assert.equal(result.vectorDb.hasServiceRoleKey, true);
+  assert.equal(result.vectorDb.serviceRoleKey, 'service...ret');
+  assert.equal(getVectorDbSetup().serviceRoleKey, 'service-role-secret');
+});
+
+test('savePublicSettings preserves previous Supabase service role key when masked key is submitted', () => {
+  savePublicSettings({
+    vectorDb: {
+      provider: 'supabase',
+      projectUrl: 'https://test.supabase.co',
+      serviceRoleKey: 'service-role-secret',
+      dimensions: 768,
+    },
+  });
+  savePublicSettings({
+    vectorDb: {
+      provider: 'supabase',
+      projectUrl: 'https://next.supabase.co',
+      serviceRoleKey: 'service...ret',
+      dimensions: 768,
+    },
+  });
+
+  assert.equal(getVectorDbSetup().projectUrl, 'https://next.supabase.co');
+  assert.equal(getVectorDbSetup().serviceRoleKey, 'service-role-secret');
 });
 
 test('savePublicSettings masks public API keys', () => {

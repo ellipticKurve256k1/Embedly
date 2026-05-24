@@ -183,6 +183,26 @@ export function normalizeRerankerSetup(setup = {}) {
   };
 }
 
+export function normalizeVectorDbSetup(setup = {}) {
+  const input = setup && typeof setup === 'object' ? setup : {};
+  const provider = input.provider === 'supabase' ? 'supabase' : 'sqlite';
+  const result = {
+    provider,
+    name: provider === 'supabase' ? 'Supabase' : 'SQLite',
+  };
+
+  if (provider === 'supabase') {
+    result.projectUrl = String(input.projectUrl ?? '').trim().replace(/\/+$/, '');
+    result.table = String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks';
+    result.dimensions = Math.max(1, Math.min(4096, coerceInteger(input.dimensions, 768)));
+    result.matchThreshold = Math.max(0, Math.min(1, coerceNumber(input.matchThreshold, 0)));
+    result.serviceRoleKey = String(input.serviceRoleKey ?? '').trim();
+    result.hasServiceRoleKey = Boolean(input.hasServiceRoleKey);
+  }
+
+  return result;
+}
+
 export async function loadSettings() {
   const response = await fetch(`${API_BASE}/settings`, {
     headers: getAuthHeaders(),
@@ -229,8 +249,18 @@ export async function saveLlmSetup(setup) {
 }
 
 export async function saveVectorDbSetup(setup) {
-  const settings = await saveSettings({ vectorDb: setup });
-  return settings.vectorDb ?? DEFAULT_VECTOR_DB_SETUP;
+  const settings = await saveSettings({ vectorDb: normalizeVectorDbSetup(setup) });
+  return normalizeVectorDbSetup(settings.vectorDb ?? DEFAULT_VECTOR_DB_SETUP);
+}
+
+export async function testVectorDbConnection(setup) {
+  const response = await fetch(`${API_BASE}/vector-db/test-connection`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(normalizeVectorDbSetup(setup)),
+  });
+
+  return parseResponse(response);
 }
 
 export async function saveChunkingConfig(config) {
@@ -292,7 +322,7 @@ export function readSavedLlmSetup() {
 }
 
 export function readSavedVectorDbSetup() {
-  return cachedSettings.vectorDb ?? DEFAULT_VECTOR_DB_SETUP;
+  return normalizeVectorDbSetup(cachedSettings.vectorDb ?? DEFAULT_VECTOR_DB_SETUP);
 }
 
 export function readSavedChunkingConfig() {

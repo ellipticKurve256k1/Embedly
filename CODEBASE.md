@@ -17,6 +17,7 @@ Embeddly is a local-first RAG knowledge search system. Users upload private docu
 | File upload | `multer` |
 | Document parsing | Local parser service with PDF, CSV, text, and Markdown support |
 | Embedding provider | Ollama embeddings API |
+| Vector database | SQLite by default, optional Supabase pgvector through Data API and RPC |
 | Optional reranker | Transformers.js local cross-encoder |
 | LLM provider | Ollama chat API or OpenAI-compatible `/v1/chat/completions` |
 | Icons | `lucide-react` |
@@ -130,7 +131,7 @@ Long-running embedding work is queued by `/api/embed` and processed by an in-pro
 | `projects` | Named document groups used to scope chat and search retrieval. |
 | `documents` | Uploaded files, stored filenames, MIME type, size, status, error, chunk count, timestamps. |
 | `chunks` | Parsed document chunks with document id, chunk index, content, token count, timestamp. |
-| `embeddings` | Vector BLOBs linked to chunks, with model, dimensions, timestamp. |
+| `embeddings` | Local SQLite vector BLOBs linked to chunks, used when SQLite VectorDB is active. |
 | `embedding_jobs` | Per-document embedding status, model, total chunks, processed chunks, error, timestamps. |
 | `settings` | Key-value settings rows with JSON value, encryption flag, and update timestamp. |
 
@@ -160,7 +161,7 @@ Settings keys:
 | `llm.setup` | `llm` | Yes, when `apiKey` is present. |
 | `embedding.setup` | `embedding` | No |
 | `chunking.config` | `chunking` | No |
-| `vector_db.setup` | `vectorDb` | No |
+| `vector_db.setup` | `vectorDb` | Yes, when Supabase `serviceRoleKey` is present. |
 | `reranker.setup` | `reranker` | No |
 
 ## 7. API Endpoints
@@ -191,6 +192,7 @@ Settings keys:
 | `/api/settings/:key` | GET | Return one public setting key. |
 | `/api/settings` | POST | Upsert settings, encrypting API-key settings. |
 | `/api/settings/:key` | DELETE | Delete one public setting key. |
+| `/api/vector-db/test-connection` | POST | Validate SQLite availability or Supabase table access before saving VectorDB settings. |
 
 ## 8. Data Flow
 
@@ -208,7 +210,8 @@ User selects files
   -> parser extracts text
   -> chunker splits content
   -> embedder calls Ollama
-  -> chunks and embeddings are stored in SQLite
+  -> chunks are stored in SQLite
+  -> vectors are written to the active VectorDB provider
   -> embedding_jobs and documents statuses update
 ```
 
@@ -220,10 +223,15 @@ User submits query
   -> optional selected projectId is sent to GET /api/search?q=...
   -> retrieval embeds query
   -> retrieval SQL filters candidates by documents.project_id when selected
-  -> vectors are compared in memory for candidate recall
+  -> active VectorDB provider returns candidate chunks
   -> optional local reranker reorders candidates when enabled
   -> ranked chunks return to SearchResults
 ```
+
+SQLite VectorDB stores vectors in the local `embeddings` table and ranks with in-process cosine
+similarity. Supabase VectorDB stores vectors in the configured remote table and retrieves candidates
+through the `match_embeddly_chunks` RPC function. Chunk content remains in SQLite for document views,
+job tracking, and adjacent context.
 
 Chat:
 
@@ -324,6 +332,7 @@ User clicks Connect Wallet
 | Reranker | `server/services/reranker.js` | Lazy-load a local Transformers.js cross-encoder and score query/chunk pairs. |
 | LLM | `server/services/llm.js` | Build prompts, rewrite follow-up queries, stream chat responses. |
 | Settings | `server/services/settings.js` | Persist settings, encrypt API keys, mask public responses. |
+| Vector stores | `server/services/vectorStores/` | Resolve SQLite or Supabase vector indexing and retrieval providers. |
 | Auth | `server/services/auth.js` | Generate LNURL challenges, verify wallet signatures, issue and validate JWT sessions. |
 
 Server utilities:
@@ -384,3 +393,7 @@ Test files live next to the source they cover, such as `server/services/chunker.
 | `PREWARM_RERANKER` | unset | Set to `true` to load the reranker model when the server starts. |
 
 No `.env` file is required for basic local development. User-facing model, retrieval, generation, and vector database settings are configurable through the Settings page and stored in SQLite.
+
+Supabase VectorDB requires applying `references/supabase-vector-schema.sql` in the Supabase SQL
+editor before saving the provider switch. The SQL uses `VECTOR(768)` by default; recreate the table
+and RPC function with the correct dimension when using a model with a different embedding size.
