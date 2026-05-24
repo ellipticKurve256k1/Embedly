@@ -4,7 +4,7 @@ Embeddly is a local-first RAG knowledge search app for private documents. It hel
 
 The app is built around a search-first interface with document upload, project-scoped retrieval, a background embedding queue, source-aware chat, and configurable model/storage settings.
 
-![Embeddly interface](references/embedly.png)
+![Embeddly interface](./embedly_interface.png)
 
 ## Features
 
@@ -103,19 +103,19 @@ Settings are persisted server-side in SQLite. Anonymous users use global setting
 
 Most user-facing configuration is managed in the Settings page. Environment variables are optional for normal local development.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PORT` | `3001` | Express server port. |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API base URL for server-side embedding and chat calls. |
-| `OLLAMA_KEEP_ALIVE` | `30m` | Ollama model keep-alive setting. |
-| `OLLAMA_NUM_CTX` | `4096` | Context window option sent to Ollama chat. |
-| `OLLAMA_NUM_PREDICT` | `384` | Max generated token option sent to Ollama chat. |
-| `OLLAMA_TEMPERATURE` | `0.2` | Generation temperature. |
-| `OLLAMA_REWRITE_TIMEOUT_MS` | `3000` | Timeout for follow-up query rewriting. |
-| `EXTERNAL_API_CHAT_TIMEOUT_MS` | `60000` | Timeout for OpenAI-compatible external chat APIs. |
-| `EMBEDDLY_ENCRYPTION_KEY` | File-backed key | Optional server-side key material for settings encryption. |
-| `TRANSFORMERS_CACHE` | `server/.models` | Optional cache directory for local reranker model downloads. |
-| `PREWARM_RERANKER` | unset | Set to `true` to load the reranker model when the server starts. |
+| Variable                       | Default                  | Purpose                                                          |
+| ------------------------------ | ------------------------ | ---------------------------------------------------------------- |
+| `PORT`                         | `3001`                   | Express server port.                                             |
+| `OLLAMA_BASE_URL`              | `http://localhost:11434` | Ollama API base URL for server-side embedding and chat calls.    |
+| `OLLAMA_KEEP_ALIVE`            | `30m`                    | Ollama model keep-alive setting.                                 |
+| `OLLAMA_NUM_CTX`               | `4096`                   | Context window option sent to Ollama chat.                       |
+| `OLLAMA_NUM_PREDICT`           | `384`                    | Max generated token option sent to Ollama chat.                  |
+| `OLLAMA_TEMPERATURE`           | `0.2`                    | Generation temperature.                                          |
+| `OLLAMA_REWRITE_TIMEOUT_MS`    | `3000`                   | Timeout for follow-up query rewriting.                           |
+| `EXTERNAL_API_CHAT_TIMEOUT_MS` | `60000`                  | Timeout for OpenAI-compatible external chat APIs.                |
+| `EMBEDDLY_ENCRYPTION_KEY`      | File-backed key          | Optional server-side key material for settings encryption.       |
+| `TRANSFORMERS_CACHE`           | `server/.models`         | Optional cache directory for local reranker model downloads.     |
+| `PREWARM_RERANKER`             | unset                    | Set to `true` to load the reranker model when the server starts. |
 
 ## Vector Storage
 
@@ -127,29 +127,29 @@ Supabase pgvector is optional. Before switching to Supabase in Settings, apply t
 
 Embeddly is designed for private local knowledge workflows, but privacy depends on the providers you configure.
 
-| Path | Purpose |
-| --- | --- |
-| `server/embedly.db` | Main SQLite database for documents, chunks, jobs, settings, and local vectors. |
-| `server/cred.sqlite` | Optional credential database for LNURL-Auth users, sessions, and user-scoped settings. |
-| `server/uploads/` | Uploaded file storage. |
-| `server/.embeddly/key` | File-backed encryption key material when `EMBEDDLY_ENCRYPTION_KEY` is not set. |
-| `server/.models/` | Default local reranker model cache. |
-| `dist/` | Vite build output. |
+| Path                   | Purpose                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `server/embedly.db`    | Main SQLite database for documents, chunks, jobs, settings, and local vectors.         |
+| `server/cred.sqlite`   | Optional credential database for LNURL-Auth users, sessions, and user-scoped settings. |
+| `server/uploads/`      | Uploaded file storage.                                                                 |
+| `server/.embeddly/key` | File-backed encryption key material when `EMBEDDLY_ENCRYPTION_KEY` is not set.         |
+| `server/.models/`      | Default local reranker model cache.                                                    |
+| `dist/`                | Vite build output.                                                                     |
 
 Private document contents should not be logged or exposed unnecessarily. If you use an external OpenAI-compatible API for chat, prompts and retrieved document context leave your local machine. Local Ollama keeps embedding and generation requests on your configured Ollama host.
 
 ## Scripts
 
-| Command | Purpose |
-| --- | --- |
-| `npm run server` | Start the Express API server. |
-| `npm run dev` | Start the Vite frontend dev server. |
-| `npm run build` | Build the frontend for production. |
-| `npm test` | Run all Node test files. |
-| `npm run test:server` | Run server tests. |
-| `npm run test:services` | Run service tests. |
-| `npm run test:coverage` | Run tests with Node coverage. |
-| `npm run test:watch` | Run tests in watch mode. |
+| Command                 | Purpose                                       |
+| ----------------------- | --------------------------------------------- |
+| `npm run server`        | Start the Express API server.                 |
+| `npm run dev`           | Start the Vite frontend dev server.           |
+| `npm run build`         | Build the frontend for production.            |
+| `npm test`              | Run all Node test files.                      |
+| `npm run test:server`   | Run server tests.                             |
+| `npm run test:services` | Run service tests.                            |
+| `npm run test:coverage` | Run tests with Node coverage.                 |
+| `npm run test:watch`    | Run tests in watch mode.                      |
 | `npm run test:filename` | Run the focused filename normalization tests. |
 
 ## Project Structure
