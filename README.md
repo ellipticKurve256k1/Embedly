@@ -4,7 +4,7 @@ Embeddly is a local-first RAG knowledge search app for private documents. It hel
 
 The app is built around a search-first interface with document upload, project-scoped retrieval, a background embedding queue, source-aware chat, and configurable model/storage settings.
 
-![Embeddly interface](./embedly_interface.png)
+![Embeddly interface](./embedly.png)
 
 ## Features
 
