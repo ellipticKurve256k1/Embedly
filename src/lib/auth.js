@@ -1,25 +1,34 @@
-const API_BASE = 'http://localhost:3001/api';
-const SESSION_TOKEN_KEY = 'embeddly_session_token';
+import { createClient } from '@supabase/supabase-js';
 
-function emitAuthChanged() {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('embeddly:auth-changed'));
+const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY ?? '';
+
+let supabase = null;
+
+function getClient() {
+  if (!supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
-}
-
-async function parseResponse(response) {
-  const payload = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(payload.error || payload.reason || `Request failed with ${response.status}`);
-  }
-
-  return payload;
+  return supabase;
 }
 
 export function getSessionToken() {
+  const client = getClient();
+  if (!client) return null;
+
+  return client.auth.getSession()
+    .then(({ data: { session } }) => session?.access_token ?? null)
+    .catch(() => null);
+}
+
+export function getAuthHeaders() {
+  const token = getSessionTokenSync();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getSessionTokenSync() {
   try {
-    return window.localStorage.getItem(SESSION_TOKEN_KEY);
+    return window.localStorage.getItem('embeddly_session_token');
   } catch {
     return null;
   }
@@ -27,87 +36,95 @@ export function getSessionToken() {
 
 export function setSessionToken(token) {
   try {
-    window.localStorage.setItem(SESSION_TOKEN_KEY, token);
-  } catch {
-    // Browser storage can be unavailable in restricted modes.
-  }
-
-  emitAuthChanged();
-}
-
-export function clearSessionToken() {
-  try {
-    window.localStorage.removeItem(SESSION_TOKEN_KEY);
-  } catch {
-    // Browser storage can be unavailable in restricted modes.
-  }
-
-  emitAuthChanged();
-}
-
-export function getAuthHeaders() {
-  const token = getSessionToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-export function getStoredAuthUserId() {
-  try {
-    return window.localStorage.getItem('embeddly_auth_user_id');
-  } catch {
-    return null;
-  }
-}
-
-export function setStoredAuthUserId(userId) {
-  try {
-    if (userId) {
-      window.localStorage.setItem('embeddly_auth_user_id', userId);
+    if (token) {
+      window.localStorage.setItem('embeddly_session_token', token);
     } else {
-      window.localStorage.removeItem('embeddly_auth_user_id');
+      window.localStorage.removeItem('embeddly_session_token');
     }
   } catch {
     // Browser storage can be unavailable in restricted modes.
   }
 }
 
-export async function startLnurlAuth() {
-  const response = await fetch(`${API_BASE}/auth/lnurl`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  });
-
-  return parseResponse(response);
+export function clearSessionToken() {
+  setSessionToken(null);
 }
 
-export async function getAuthStatus(k1) {
-  const searchParams = new URLSearchParams();
-  if (k1) {
-    searchParams.set('k1', k1);
+export function emitAuthChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('embeddly:auth-changed'));
   }
-
-  const queryString = searchParams.toString();
-  const response = await fetch(`${API_BASE}/auth/status${queryString ? `?${queryString}` : ''}`, {
-    headers: getAuthHeaders(),
-  });
-
-  return parseResponse(response);
 }
 
-export async function logout() {
-  await fetch(`${API_BASE}/auth/logout`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-  }).catch(() => {});
+export async function signInWithEmail(email, password) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase is not configured.');
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  if (data?.session) {
+    setSessionToken(data.session.access_token);
+    emitAuthChanged();
+  }
+  return data;
+}
 
+export async function signInWithMagicLink(email) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase is not configured.');
+  const { error } = await client.auth.signInWithOtp({ email });
+  if (error) throw error;
+}
+
+export async function signInWithOAuth(provider) {
+  const client = getClient();
+  if (!client) throw new Error('Supabase is not configured.');
+  const { error } = await client.auth.signInWithOAuth({ provider });
+  if (error) throw error;
+}
+
+export async function signOut() {
+  const client = getClient();
+  if (client) {
+    await client.auth.signOut().catch(() => {});
+  }
   clearSessionToken();
-  setStoredAuthUserId(null);
+  emitAuthChanged();
+}
+
+export async function getAuthStatus() {
+  const client = getClient();
+  if (!client) return { authenticated: false };
+
+  const { data: { session }, error } = await client.auth.getSession();
+  if (error || !session) return { authenticated: false };
+
+  return {
+    authenticated: true,
+    userId: session.user.id,
+    email: session.user.email,
+  };
+}
+
+export function initAuthListener(callback) {
+  const client = getClient();
+  if (!client) return () => {};
+
+  const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      setSessionToken(session.access_token);
+    } else {
+      clearSessionToken();
+    }
+    emitAuthChanged();
+    callback?.();
+  });
+
+  return () => subscription?.unsubscribe();
 }
 
 export function formatUserId(userId) {
   const value = String(userId ?? '').trim();
-  if (value.length <= 14) {
-    return value || 'Wallet';
-  }
+  if (value.length <= 14) return value || 'User';
 
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 }

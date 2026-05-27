@@ -15,6 +15,6 @@ export function createVectorStore(setup = DEFAULT_VECTOR_DB_SETUP) {
   return createSqliteVectorStore();
 }
 
-export function getVectorStore(userId) {
-  return createVectorStore(getVectorDbSetup(userId) ?? DEFAULT_VECTOR_DB_SETUP);
+export function getVectorStore() {
+  return createVectorStore(getVectorDbSetup() ?? DEFAULT_VECTOR_DB_SETUP);
 }

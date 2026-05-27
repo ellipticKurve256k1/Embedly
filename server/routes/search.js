@@ -17,8 +17,8 @@ router.get('/', async (request, response) => {
     return;
   }
 
-  const embeddingSetup = getEmbeddingSetup(request.userId) ?? {};
-  const rerankerSetup = getRerankerSetup(request.userId) ?? {};
+  const embeddingSetup = getEmbeddingSetup() ?? {};
+  const rerankerSetup = getRerankerSetup() ?? {};
   const model = String(request.query.model || embeddingSetup.model || DEFAULT_EMBEDDING_MODEL).trim();
   const candidateLimit = rerankerSetup.candidateLimit ?? SEARCH_CANDIDATE_LIMIT;
   const topK = rerankerSetup.topK ?? SEARCH_RETRIEVAL_LIMIT;
@@ -28,7 +28,7 @@ router.get('/', async (request, response) => {
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
     projectId,
-    userId: request.userId,
+    userId: null,
   });
   const rerankerUsed = results.some((result) => typeof result.rerankScore === 'number');
 

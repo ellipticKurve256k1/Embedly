@@ -161,7 +161,7 @@ class EmbedQueue {
     const model = String(options.model || DEFAULT_EMBEDDING_MODEL).trim() || DEFAULT_EMBEDDING_MODEL;
     const jobId = uuidv4();
     const createdAt = nowIso();
-    const vectorDbSetup = getVectorDbSetup(options.userId);
+    const vectorDbSetup = getVectorDbSetup();
     const vectorStore = createVectorStore(vectorDbSetup);
 
     clearDocumentIndex(document.id);

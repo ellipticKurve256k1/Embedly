@@ -88,7 +88,7 @@ router.delete('/:id', async (request, response) => {
   }
 
   try {
-    await getVectorStore(request.userId).clearDocumentIndex(document.id);
+    await getVectorStore().clearDocumentIndex(document.id);
   } catch (error) {
     response.status(500).json({
       error: error instanceof Error ? error.message : 'Unable to clear vector index.',

@@ -8,12 +8,12 @@ import {
 
 const router = express.Router();
 
-router.get('/', (request, response) => {
-  response.json(getAllPublicSettings(request.userId));
+router.get('/', (_request, response) => {
+  response.json(getAllPublicSettings());
 });
 
 router.get('/:key', (request, response) => {
-  const setting = getPublicSetting(request.params.key, request.userId);
+  const setting = getPublicSetting(request.params.key);
 
   if (setting === undefined) {
     response.status(404).json({ error: 'Unknown setting key.' });
@@ -24,11 +24,11 @@ router.get('/:key', (request, response) => {
 });
 
 router.post('/', (request, response) => {
-  response.json(savePublicSettings(request.body, request.userId));
+  response.json(savePublicSettings(request.body));
 });
 
 router.delete('/:key', (request, response) => {
-  if (!deletePublicSetting(request.params.key, request.userId)) {
+  if (!deletePublicSetting(request.params.key)) {
     response.status(404).json({ error: 'Unknown setting key.' });
     return;
   }

@@ -122,7 +122,7 @@ function buildContextEvent({
 
 router.post('/', async (request, response) => {
   const message = String(request.body?.message ?? '').trim();
-  const savedLlmSetup = getLlmSetup(request.userId) ?? {};
+  const savedLlmSetup = getLlmSetup() ?? {};
   const rawLlmSetup = request.body?.llmSetup && typeof request.body.llmSetup === 'object'
     ? request.body.llmSetup
     : {};
@@ -135,7 +135,7 @@ router.post('/', async (request, response) => {
     ? requestedApiKey
     : savedApiKey;
   const llmConfig = { provider, model, endpoint, apiKey };
-  const savedEmbeddingSetup = getEmbeddingSetup(request.userId) ?? {};
+  const savedEmbeddingSetup = getEmbeddingSetup() ?? {};
   const embeddingModel = String(
     request.body?.embeddingModel
       || savedEmbeddingSetup.model
@@ -147,7 +147,7 @@ router.post('/', async (request, response) => {
     : uuidv4();
   const bodyHistory = sanitizeHistory(request.body?.history);
   const projectId = String(request.body?.projectId ?? '').trim() || null;
-  const rerankerSetup = getRerankerSetup(request.userId) ?? {};
+  const rerankerSetup = getRerankerSetup() ?? {};
   const candidateLimit = rerankerSetup.candidateLimit ?? CHAT_CANDIDATE_LIMIT;
   const topK = rerankerSetup.topK ?? CHAT_RETRIEVAL_LIMIT;
   const retrievalOptions = {
@@ -156,7 +156,7 @@ router.post('/', async (request, response) => {
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
     projectId,
-    userId: request.userId,
+    userId: null,
   };
 
   response.setHeader('Content-Type', 'text/event-stream');

@@ -10,7 +10,7 @@ router.post('/test-connection', async (request, response) => {
   const provider = setup.provider === 'supabase' ? 'supabase' : 'sqlite';
 
   try {
-    const previousSetup = getVectorDbSetup(request.userId);
+    const previousSetup = getVectorDbSetup();
     const requestedServiceRoleKey = String(setup.serviceRoleKey ?? '').trim();
     const resolvedSetup = provider === 'supabase'
       ? {

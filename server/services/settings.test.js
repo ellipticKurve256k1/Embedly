@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { afterEach } from 'node:test';
 import { db } from '../db.js';
-import { credentialDb } from '../db/credentials.js';
 import {
   deletePublicSetting,
   deleteSetting,
@@ -22,8 +21,6 @@ afterEach(() => {
     deleteSetting(key);
   }
   deleteSetting('test.raw');
-  credentialDb.prepare("DELETE FROM user_settings WHERE user_id LIKE 'test-user%'").run();
-  credentialDb.prepare("DELETE FROM users WHERE id LIKE 'test-user%'").run();
 });
 
 test('getSetting returns null for missing key', () => {
@@ -189,48 +186,4 @@ test('getAllPublicSettings returns only supported public keys', () => {
   setSetting('test.raw', { hidden: true });
   savePublicSettings({ chunking: { strategy: 'fixed' } });
   assert.deepEqual(Object.keys(getAllPublicSettings()), ['chunking']);
-});
-
-test('user settings override global settings without replacing global values', () => {
-  savePublicSettings({ embedding: { provider: 'ollama', model: 'global-model' } });
-  savePublicSettings(
-    { embedding: { provider: 'ollama', model: 'user-model' } },
-    'test-user-settings',
-  );
-
-  assert.equal(getPublicSetting('embedding').model, 'global-model');
-  assert.equal(getPublicSetting('embedding', 'test-user-settings').model, 'user-model');
-});
-
-test('missing user settings fall back to global settings', () => {
-  savePublicSettings({ vectorDb: { provider: 'sqlite', name: 'SQLite' } });
-
-  assert.deepEqual(getPublicSetting('vectorDb', 'test-user-fallback'), {
-    provider: 'sqlite',
-    name: 'SQLite',
-  });
-});
-
-test('user API keys are encrypted in the credential database', () => {
-  savePublicSettings(
-    {
-      llm: {
-        provider: 'api',
-        model: 'gpt',
-        endpoint: 'https://example.test/v1',
-        apiKey: 'sk-user-secret',
-      },
-    },
-    'test-user-secret',
-  );
-
-  const row = credentialDb.prepare(`
-    SELECT value, encrypted
-    FROM user_settings
-    WHERE user_id = ? AND key = ?
-  `).get('test-user-secret', SETTINGS_KEYS.llm);
-
-  assert.equal(row.encrypted, 1);
-  assert.doesNotMatch(row.value, /sk-user-secret/);
-  assert.equal(getPublicSetting('llm', 'test-user-secret').apiKey, 'sk-user...ret');
 });

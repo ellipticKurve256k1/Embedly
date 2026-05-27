@@ -1,76 +1,54 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { LogOut, UserRound, Zap } from 'lucide-react';
+import { LogIn, LogOut, UserRound } from 'lucide-react';
 import {
-  clearSessionToken,
-  formatUserId,
   getAuthStatus,
   getSessionToken,
-  getStoredAuthUserId,
-  logout,
-  setStoredAuthUserId,
+  initAuthListener,
+  signOut,
 } from '../lib/auth.js';
-import LoginModal from './LoginModal.jsx';
+import LoginForm from './LoginForm.jsx';
 import './LoginButton.css';
 
 export default function LoginButton() {
   const menuRef = useRef(null);
   const [authState, setAuthState] = useState(() => ({
     authenticated: Boolean(getSessionToken()),
-    userId: getStoredAuthUserId(),
+    userId: null,
+    email: null,
   }));
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const refreshAuthState = useCallback(async () => {
-    if (!getSessionToken()) {
-      setStoredAuthUserId(null);
-      setAuthState({ authenticated: false, userId: null });
-      return;
-    }
-
     try {
       const payload = await getAuthStatus();
 
       if (payload.authenticated) {
-        setStoredAuthUserId(payload.userId);
-        setAuthState({ authenticated: true, userId: payload.userId });
+        setAuthState({
+          authenticated: true,
+          userId: payload.userId,
+          email: payload.email,
+        });
       } else {
-        clearSessionToken();
-        setStoredAuthUserId(null);
-        setAuthState({ authenticated: false, userId: null });
+        setAuthState({ authenticated: false, userId: null, email: null });
       }
     } catch {
-      setAuthState({ authenticated: Boolean(getSessionToken()), userId: getStoredAuthUserId() });
+      setAuthState({ authenticated: false, userId: null, email: null });
     }
   }, []);
 
   useEffect(() => {
     refreshAuthState();
 
-    const handleAuthChanged = () => {
+    const unsubscribe = initAuthListener(() => {
       refreshAuthState();
-    };
+    });
 
-    const handleStorage = (event) => {
-      if (event.key === 'embeddly_session_token') {
-        refreshAuthState();
-      }
-    };
-
-    window.addEventListener('embeddly:auth-changed', handleAuthChanged);
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      window.removeEventListener('embeddly:auth-changed', handleAuthChanged);
-      window.removeEventListener('storage', handleStorage);
-    };
+    return () => unsubscribe();
   }, [refreshAuthState]);
 
   useEffect(() => {
-    if (!isMenuOpen) {
-      return undefined;
-    }
+    if (!isMenuOpen) return undefined;
 
     const handlePointerDown = (event) => {
       if (!menuRef.current?.contains(event.target)) {
@@ -84,27 +62,27 @@ export default function LoginButton() {
 
   const handleLogout = async () => {
     setIsMenuOpen(false);
-    await logout();
-    setAuthState({ authenticated: false, userId: null });
+    await signOut();
+    setAuthState({ authenticated: false, userId: null, email: null });
   };
 
   if (!authState.authenticated) {
     return (
       <>
-        <button className="login-button" type="button" onClick={() => setIsModalOpen(true)}>
-          <Zap size={18} />
-          <span>Connect Wallet</span>
+        <button className="login-button" type="button" onClick={() => setIsFormOpen(true)}>
+          <LogIn size={18} />
+          <span>Sign In</span>
         </button>
-        {isModalOpen && createPortal(
-          <LoginModal
-            onClose={() => setIsModalOpen(false)}
-            onAuthenticated={refreshAuthState}
-          />,
-          document.body,
+        {isFormOpen && (
+          <LoginForm onClose={() => setIsFormOpen(false)} />
         )}
       </>
     );
   }
+
+  const displayLabel = authState.email || (authState.userId
+    ? `${authState.userId.slice(0, 6)}...${authState.userId.slice(-4)}`
+    : 'Account');
 
   return (
     <div className="login-menu" ref={menuRef}>
@@ -116,14 +94,14 @@ export default function LoginButton() {
         aria-haspopup="menu"
       >
         <UserRound size={18} />
-        <span>{formatUserId(authState.userId)}</span>
+        <span>{displayLabel}</span>
       </button>
 
       {isMenuOpen && (
         <div className="login-menu__dropdown" role="menu">
           <button type="button" role="menuitem" onClick={handleLogout}>
             <LogOut size={16} />
-            <span>Disconnect</span>
+            <span>Sign Out</span>
           </button>
         </div>
       )}

@@ -1,10 +1,10 @@
 # Embeddly Codebase
 
-Last updated: 2026-05-16
+Last updated: 2026-05-27
 
 ## 1. Overview
 
-Embeddly is a local-first RAG knowledge search system. Users upload private documents, group them into projects, embed parsed chunks, search semantically, and chat with retrieved context scoped to all documents or one selected project. Generation can use local Ollama models or an OpenAI-compatible external API. Settings are persisted server-side in SQLite, with API keys encrypted at rest. Optional LNURL-Auth login lets Lightning wallet users keep settings and credentials isolated in a separate credential database.
+Embeddly is a local-first RAG knowledge search system. Users upload private documents, group them into projects, embed parsed chunks, search semantically, and chat with retrieved context scoped to all documents or one selected project. Generation can use local Ollama models or an OpenAI-compatible external API. Settings are persisted server-side in SQLite, with API keys encrypted at rest. Optional Supabase Auth lets users sign in with email, magic link, or OAuth providers.
 
 ## 2. Technology Stack
 
@@ -21,7 +21,7 @@ Embeddly is a local-first RAG knowledge search system. Users upload private docu
 | Optional reranker | Transformers.js local cross-encoder |
 | LLM provider | Ollama chat API or OpenAI-compatible `/v1/chat/completions` |
 | Icons | `lucide-react` |
-| Auth | LNURL-Auth with Lightning wallets |
+| Auth | Supabase Auth (email, magic link, OAuth; optional, anonymous by default) |
 | Tests | Node built-in test runner |
 
 ## 3. Directory Structure
@@ -55,7 +55,6 @@ Generated or local runtime data:
 | Path | Purpose |
 |------|---------|
 | `server/embedly.db` | SQLite database, ignored by git. |
-| `server/cred.sqlite` | Per-user credential database, ignored by git. |
 | `server/uploads/` | Uploaded file storage, ignored by git. |
 | `server/.embeddly/key` | Settings encryption key, ignored by git. |
 | `dist/` | Vite build output, ignored by git. |
@@ -135,14 +134,6 @@ Long-running embedding work is queued by `/api/embed` and processed by an in-pro
 | `embedding_jobs` | Per-document embedding status, model, total chunks, processed chunks, error, timestamps. |
 | `settings` | Key-value settings rows with JSON value, encryption flag, and update timestamp. |
 
-Credential database tables in `server/cred.sqlite`:
-
-| Table | Purpose |
-|-------|---------|
-| `users` | LNURL-Auth wallet linking public keys. |
-| `sessions` | Revocable JWT session IDs with expiration timestamps. |
-| `user_settings` | Per-user settings rows with the same value/encryption shape as global settings. |
-
 Chat conversations are not stored in SQLite. The browser stores up to 30 conversations in IndexedDB under the `embeddly-chat` database, and each saved conversation keeps up to 30 messages.
 
 Important relationships:
@@ -152,7 +143,7 @@ Important relationships:
 - `embedding_jobs.document_id` references `documents.id` with cascade delete.
 - `documents.project_id` references `projects.id` with `ON DELETE SET NULL`.
 
-Global settings remain the anonymous fallback. When `req.userId` is present, settings reads check `user_settings` first and fall back to global rows by setting key. Settings writes and deletes are scoped to `user_settings` for authenticated users.
+All settings are stored globally in the `settings` table of `embedly.db`.
 
 Settings keys:
 
@@ -169,10 +160,8 @@ Settings keys:
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/api/health` | GET | Server health check. |
-| `/api/auth/lnurl` | POST | Start LNURL-Auth and return `{ k1, lnurl }`. |
-| `/api/auth/lnurl/callback` | GET | Wallet callback that verifies the LNURL signature. |
-| `/api/auth/status` | GET | Validate a bearer token or poll a completed LNURL challenge. |
-| `/api/auth/logout` | POST | Revoke the current session. |
+| `/api/auth/status` | GET | Validate a Supabase bearer token. |
+| `/api/auth/logout` | POST | Return unauthenticated (session revoked client-side). |
 | `/api/upload` | POST | Upload files and create document rows. |
 | `/api/projects` | GET/POST | List projects with document counts or create a project. |
 | `/api/projects/:id` | PATCH/DELETE | Rename, describe, or delete a project. Deletion unassigns documents. |
@@ -273,17 +262,15 @@ User creates a project in Settings
   -> retrieval.js filters joined document rows before similarity ranking and reranking
 ```
 
-LNURL-Auth:
+Supabase Auth:
 
 ```text
-User clicks Connect Wallet
-  -> POST /api/auth/lnurl creates a 5-minute k1 challenge
-  -> frontend shows LNURL QR and optional WebLN action
-  -> wallet calls /api/auth/lnurl/callback with k1, sig, and key
-  -> server verifies secp256k1 signature and stores/updates the user
-  -> server issues a 24-hour JWT session and marks k1 complete
-  -> frontend polls /api/auth/status?k1=...
-  -> token is stored in localStorage and sent as Authorization: Bearer
+User clicks Sign In
+  -> Frontend opens LoginForm (email/password, magic link, or OAuth)
+  -> Supabase client calls Supabase Auth API
+  -> Frontend stores access token and sends as Authorization: Bearer
+  -> Server middleware verifies token via supabase.auth.getUser()
+  -> request.userId is set for authenticated requests
 ```
 
 ## 9. Key Components
@@ -294,8 +281,8 @@ User clicks Connect Wallet
 | `ModeTabs` | `src/components/ModeTabs.jsx` | Switches between chat, upload, and search modes. |
 | `ModelStatusBar` | `src/components/ModelStatusBar.jsx` | Shows configured embedding, generation, and vector DB state. |
 | `EmbeddingIndicator` | `src/components/EmbeddingIndicator.jsx` | Topbar status surface for active background embedding jobs and recent completion/failure. |
-| `LoginButton` | `src/components/LoginButton.jsx` | Shows wallet login state and disconnect menu. |
-| `LoginModal` | `src/components/LoginModal.jsx` | Displays LNURL QR code, copy action, browser-wallet auth action, and polling status. |
+| `LoginButton` | `src/components/LoginButton.jsx` | Shows sign-in state and dropdown with Sign Out. |
+| `LoginForm` | `src/components/LoginForm.jsx` | Email/password and magic link sign-in modal. |
 | `ChatPanel` | `src/components/ChatPanel.jsx` | Owns active chat state, IndexedDB persistence, sidebar actions, and streaming lifecycle. |
 | `ChatSidebar` | `src/components/ChatSidebar.jsx` | Collapsible conversation list with new-chat, rename, delete, and storage status controls. |
 | `ChatSessionItem` | `src/components/ChatSessionItem.jsx` | Individual conversation row with active, collapsed, rename, and delete affordances. |
@@ -333,7 +320,7 @@ User clicks Connect Wallet
 | LLM | `server/services/llm.js` | Build prompts, rewrite follow-up queries, stream chat responses. |
 | Settings | `server/services/settings.js` | Persist settings, encrypt API keys, mask public responses. |
 | Vector stores | `server/services/vectorStores/` | Resolve SQLite or Supabase vector indexing and retrieval providers. |
-| Auth | `server/services/auth.js` | Generate LNURL challenges, verify wallet signatures, issue and validate JWT sessions. |
+| Auth | `server/services/supabase.js` | Initialize Supabase admin client for token verification. |
 
 Server utilities:
 
@@ -341,7 +328,6 @@ Server utilities:
 |---------|------|---------|
 | Filename normalization | `server/lib/filename.js` | Normalize uploaded filenames and prevent unsafe names. |
 | Filename tests | `server/lib/filename.test.js` | Node test coverage for filename normalization. |
-| Credential database | `server/db/credentials.js` | Initialize and query `cred.sqlite` users, sessions, and user settings. |
 
 ## 11. Development Conventions
 
@@ -391,8 +377,12 @@ Test files live next to the source they cover, such as `server/services/chunker.
 | `EMBEDDLY_ENCRYPTION_KEY` | file-backed key | Optional server-side key material for settings encryption. |
 | `TRANSFORMERS_CACHE` | `server/.models` | Optional cache directory for local reranker model downloads. |
 | `PREWARM_RERANKER` | unset | Set to `true` to load the reranker model when the server starts. |
+| `SUPABASE_URL` | unset | Supabase project URL for server-side JWT verification. |
+| `VITE_SUPABASE_URL` | unset | Supabase project URL exposed to the frontend. |
+| `SUPABASE_ANON_KEY` | unset | Supabase anon key for server-side `auth.getUser()` calls. |
+| `VITE_SUPABASE_ANON_KEY` | unset | Supabase anon key exposed to the frontend. |
 
-No `.env` file is required for basic local development. User-facing model, retrieval, generation, and vector database settings are configurable through the Settings page and stored in SQLite.
+No `.env` file is required for basic local development. User-facing model, retrieval, generation, and vector database settings are configurable through the Settings page and stored in SQLite. Supabase Auth is optional; when Supabase environment variables are not set, the app runs in anonymous mode.
 
 Supabase VectorDB requires applying `references/supabase-vector-schema.sql` in the Supabase SQL
 editor before saving the provider switch. The SQL uses `VECTOR(768)` by default; recreate the table

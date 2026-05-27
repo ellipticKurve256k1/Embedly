@@ -46,7 +46,7 @@ router.post('/', async (request, response, next) => {
     const jobs = await embedQueue.enqueueDocuments(uniqueDocumentIds, {
       chunking: request.body?.chunking,
       model,
-      userId: request.userId,
+      userId: null,
     });
 
     response.status(202).json({

@@ -2,12 +2,6 @@ import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { db, nowIso, SERVER_DIR } from '../db.js';
-import {
-  deleteUserSettingRow,
-  getAllUserSettingRows,
-  getUserSettingRow,
-  setUserSettingRow,
-} from '../db/credentials.js';
 import { DEFAULT_RERANKER_CONFIG } from './reranker.js';
 
 export const SETTINGS_KEYS = {
@@ -155,7 +149,7 @@ function toPublicSetting(publicKey, value) {
   return value;
 }
 
-function normalizeLlmSetup(value, userId) {
+function normalizeLlmSetup(value) {
   const input = value && typeof value === 'object' ? value : {};
   const provider = input.provider === 'api' ? 'api' : 'ollama';
   const setup = {
@@ -165,7 +159,7 @@ function normalizeLlmSetup(value, userId) {
   };
 
   if (provider === 'api') {
-    const previousSetup = getLlmSetup(userId);
+    const previousSetup = getLlmSetup();
     const nextApiKey = String(input.apiKey ?? '').trim();
     const previousApiKey = String(previousSetup?.apiKey ?? '').trim();
 
@@ -218,7 +212,7 @@ function normalizeRerankerSetup(value) {
   };
 }
 
-function normalizeVectorDbSetup(value, userId) {
+function normalizeVectorDbSetup(value) {
   const input = value && typeof value === 'object' ? value : {};
   const provider = input.provider === 'supabase' ? 'supabase' : 'sqlite';
   const setup = {
@@ -227,7 +221,7 @@ function normalizeVectorDbSetup(value, userId) {
   };
 
   if (provider === 'supabase') {
-    const previousSetup = getVectorDbSetup(userId);
+    const previousSetup = getVectorDbSetup();
     const nextServiceRoleKey = String(input.serviceRoleKey ?? '').trim();
     const previousServiceRoleKey = String(previousSetup?.serviceRoleKey ?? '').trim();
 
@@ -246,9 +240,9 @@ function normalizeVectorDbSetup(value, userId) {
   return setup;
 }
 
-function normalizeSetting(publicKey, value, userId) {
+function normalizeSetting(publicKey, value) {
   if (publicKey === 'llm') {
-    return normalizeLlmSetup(value, userId);
+    return normalizeLlmSetup(value);
   }
 
   if (publicKey === 'reranker') {
@@ -256,7 +250,7 @@ function normalizeSetting(publicKey, value, userId) {
   }
 
   if (publicKey === 'vectorDb') {
-    return normalizeVectorDbSetup(value, userId);
+    return normalizeVectorDbSetup(value);
   }
 
   return value;
@@ -270,23 +264,14 @@ function getGlobalSettingsRows() {
   return db.prepare('SELECT key, value, encrypted FROM settings').all();
 }
 
-export function getSetting(storageKey, userId) {
-  const row = userId
-    ? getUserSettingRow(userId, storageKey) ?? getGlobalSettingRow(storageKey)
-    : getGlobalSettingRow(storageKey);
-
-  return parseSettingValue(row);
+export function getSetting(storageKey) {
+  return parseSettingValue(getGlobalSettingRow(storageKey));
 }
 
-export function setSetting(storageKey, value, userId) {
+export function setSetting(storageKey, value) {
   const encrypted = shouldEncryptSetting(value) ? 1 : 0;
   const serializedValue = JSON.stringify(value);
   const storedValue = encrypted ? encryptSetting(serializedValue) : serializedValue;
-
-  if (userId) {
-    setUserSettingRow(userId, storageKey, storedValue, encrypted);
-    return;
-  }
 
   db.prepare(`
     INSERT INTO settings (key, value, encrypted, updated_at)
@@ -298,19 +283,12 @@ export function setSetting(storageKey, value, userId) {
   `).run(storageKey, storedValue, encrypted, nowIso());
 }
 
-export function deleteSetting(storageKey, userId) {
-  if (userId) {
-    deleteUserSettingRow(userId, storageKey);
-    return;
-  }
-
+export function deleteSetting(storageKey) {
   db.prepare('DELETE FROM settings WHERE key = ?').run(storageKey);
 }
 
-export function getAllSettings(userId) {
-  const rows = userId
-    ? [...getGlobalSettingsRows(), ...getAllUserSettingRows(userId)]
-    : getGlobalSettingsRows();
+export function getAllSettings() {
+  const rows = getGlobalSettingsRows();
   const settings = {};
 
   for (const row of rows) {
@@ -328,8 +306,8 @@ export function getAllSettings(userId) {
   return settings;
 }
 
-export function getAllPublicSettings(userId) {
-  const settings = getAllSettings(userId);
+export function getAllPublicSettings() {
+  const settings = getAllSettings();
 
   return Object.fromEntries(
     Object.entries(settings).map(([publicKey, value]) => [
@@ -339,16 +317,16 @@ export function getAllPublicSettings(userId) {
   );
 }
 
-export function getPublicSetting(publicKey, userId) {
+export function getPublicSetting(publicKey) {
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
   if (!storageKey) {
     return undefined;
   }
 
-  return toPublicSetting(publicKey, getSetting(storageKey, userId));
+  return toPublicSetting(publicKey, getSetting(storageKey));
 }
 
-export function savePublicSettings(settings, userId) {
+export function savePublicSettings(settings) {
   const input = settings && typeof settings === 'object' ? settings : {};
 
   for (const [publicKey, value] of Object.entries(input)) {
@@ -358,43 +336,43 @@ export function savePublicSettings(settings, userId) {
     }
 
     if (value === null) {
-      deleteSetting(storageKey, userId);
+      deleteSetting(storageKey);
       continue;
     }
 
-    setSetting(storageKey, normalizeSetting(publicKey, value, userId), userId);
+    setSetting(storageKey, normalizeSetting(publicKey, value));
   }
 
-  return getAllPublicSettings(userId);
+  return getAllPublicSettings();
 }
 
-export function deletePublicSetting(publicKey, userId) {
+export function deletePublicSetting(publicKey) {
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
   if (!storageKey) {
     return false;
   }
 
-  deleteSetting(storageKey, userId);
+  deleteSetting(storageKey);
   return true;
 }
 
-export function getLlmSetup(userId) {
-  return getSetting(SETTINGS_KEYS.llm, userId);
+export function getLlmSetup() {
+  return getSetting(SETTINGS_KEYS.llm);
 }
 
-export function getEmbeddingSetup(userId) {
-  return getSetting(SETTINGS_KEYS.embedding, userId);
+export function getEmbeddingSetup() {
+  return getSetting(SETTINGS_KEYS.embedding);
 }
 
-export function getChunkingConfig(userId) {
-  return getSetting(SETTINGS_KEYS.chunking, userId);
+export function getChunkingConfig() {
+  return getSetting(SETTINGS_KEYS.chunking);
 }
 
-export function getVectorDbSetup(userId) {
-  return getSetting(SETTINGS_KEYS.vectorDb, userId);
+export function getVectorDbSetup() {
+  return getSetting(SETTINGS_KEYS.vectorDb);
 }
 
-export function getRerankerSetup(userId) {
-  const setting = getSetting(SETTINGS_KEYS.reranker, userId);
+export function getRerankerSetup() {
+  const setting = getSetting(SETTINGS_KEYS.reranker);
   return setting ? normalizeRerankerSetup(setting) : null;
 }
