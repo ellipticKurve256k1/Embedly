@@ -43,10 +43,24 @@ function computeSettingsStatus({ embeddingSetup, llmSetup, vectorDbSetup }) {
   };
 }
 
+function normalizeRoutePage(location) {
+  const rawHash = location.hash || '';
+
+  if (rawHash) {
+    const hashRoute = rawHash
+      .slice(1)
+      .split('?')[0]
+      .replace(/^\/+|\/+$/g, '');
+
+    return hashRoute === 'settings' ? 'settings' : 'search';
+  }
+
+  const pathname = (location.pathname || '/').replace(/\/+$/g, '') || '/';
+  return pathname === '/settings' ? 'settings' : 'search';
+}
+
 export default function App() {
-  const [page, setPage] = useState(() => (
-    window.location.hash === '#settings' ? 'settings' : 'search'
-  ));
+  const [page, setPage] = useState(() => normalizeRoutePage(window.location));
 
   const [mode, setMode] = useState('chat');
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
@@ -105,8 +119,8 @@ export default function App() {
   }, [refreshConfiguredSettings, refreshProjects]);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setPage(window.location.hash === '#settings' ? 'settings' : 'search');
+    const handleRouteChange = () => {
+      setPage(normalizeRoutePage(window.location));
       setMode('chat');
       refreshConfiguredSettings();
       refreshProjects().catch(() => {});
@@ -127,12 +141,14 @@ export default function App() {
       refreshProjects().catch(() => {});
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleRouteChange);
+    window.addEventListener('popstate', handleRouteChange);
     window.addEventListener('embeddly:settings-changed', handleSettingsChange);
     window.addEventListener('embeddly:auth-changed', handleAuthChange);
     window.addEventListener('embeddly:projects-changed', handleProjectsChange);
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('hashchange', handleRouteChange);
+      window.removeEventListener('popstate', handleRouteChange);
       window.removeEventListener('embeddly:settings-changed', handleSettingsChange);
       window.removeEventListener('embeddly:auth-changed', handleAuthChange);
       window.removeEventListener('embeddly:projects-changed', handleProjectsChange);

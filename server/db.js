@@ -85,6 +85,7 @@ export const SCHEMA_SQL = `
 export function initializeSchema(database) {
   database.pragma('foreign_keys = ON');
   database.exec(SCHEMA_SQL);
+  ensureSettingsKeyConstraint(database);
 
   const documentColumns = database.prepare('PRAGMA table_info(documents)').all();
   const hasProjectColumn = documentColumns.some((column) => column.name === 'project_id');
@@ -97,6 +98,75 @@ export function initializeSchema(database) {
 }
 
 initializeSchema(db);
+
+function hasUniqueSettingsKey(database) {
+  const settingsColumns = database.prepare('PRAGMA table_info(settings)').all();
+  const keyColumn = settingsColumns.find((column) => column.name === 'key');
+  const primaryKeyColumns = settingsColumns.filter((column) => column.pk);
+
+  if (keyColumn?.pk && primaryKeyColumns.length === 1) {
+    return true;
+  }
+
+  const indexes = database.prepare('PRAGMA index_list(settings)').all();
+  return indexes.some((index) => {
+    if (!index.unique) return false;
+
+    const indexedColumns = database.prepare(`PRAGMA index_info(${JSON.stringify(index.name)})`).all();
+    return indexedColumns.length === 1 && indexedColumns[0]?.name === 'key';
+  });
+}
+
+function ensureSettingsKeyConstraint(database) {
+  if (hasUniqueSettingsKey(database)) {
+    return;
+  }
+
+  const settingsColumns = database.prepare('PRAGMA table_info(settings)').all();
+  const hasUserIdColumn = settingsColumns.some((column) => column.name === 'user_id');
+  const rowOrdering = hasUserIdColumn
+    ? "ORDER BY CASE WHEN user_id = '' THEN 1 ELSE 0 END ASC, updated_at ASC"
+    : 'ORDER BY updated_at ASC';
+  const legacyRows = database
+    .prepare(`SELECT key, value, encrypted, updated_at FROM settings WHERE key IS NOT NULL ${rowOrdering}`)
+    .all();
+
+  const migrateSettings = database.transaction((rows) => {
+    database.exec(`
+      DROP TABLE IF EXISTS settings_migration_backup;
+      ALTER TABLE settings RENAME TO settings_migration_backup;
+
+      CREATE TABLE settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        encrypted INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    const insertSetting = database.prepare(`
+      INSERT INTO settings (key, value, encrypted, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        encrypted = excluded.encrypted,
+        updated_at = excluded.updated_at
+    `);
+
+    for (const row of rows) {
+      insertSetting.run(
+        row.key,
+        row.value ?? 'null',
+        row.encrypted ? 1 : 0,
+        row.updated_at || nowIso(),
+      );
+    }
+
+    database.exec('DROP TABLE settings_migration_backup');
+  });
+
+  migrateSettings(legacyRows);
+}
 
 export function nowIso() {
   return new Date().toISOString();

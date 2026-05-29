@@ -135,6 +135,43 @@ test('settings can be inserted and updated', () => {
   database.close();
 });
 
+test('initializeSchema repairs legacy user-scoped settings constraint', () => {
+  const database = new Database(':memory:');
+  database.exec(`
+    CREATE TABLE settings (
+      user_id TEXT NOT NULL DEFAULT '',
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      encrypted INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, key)
+    )
+  `);
+  database.prepare('INSERT INTO settings (user_id, key, value, encrypted, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run('user-1', 'embedding.setup', '{"model":"user"}', 0, '2026-01-02T00:00:00.000Z');
+  database.prepare('INSERT INTO settings (user_id, key, value, encrypted, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run('', 'embedding.setup', '{"model":"global"}', 0, '2026-01-01T00:00:00.000Z');
+
+  initializeSchema(database);
+
+  const columns = database.prepare('PRAGMA table_info(settings)').all();
+  assert.equal(columns.some((column) => column.name === 'user_id'), false);
+  assert.equal(columns.find((column) => column.name === 'key')?.pk, 1);
+
+  database.prepare(`
+    INSERT INTO settings (key, value, encrypted, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      encrypted = excluded.encrypted,
+      updated_at = excluded.updated_at
+  `).run('embedding.setup', '{"model":"updated"}', 0, nowIso());
+
+  const row = database.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get('embedding.setup');
+  assert.deepEqual(row, { value: '{"model":"updated"}', encrypted: 0 });
+  database.close();
+});
+
 test('deleting a project unassigns documents', () => {
   const database = createMemoryDb();
   database.prepare('INSERT INTO projects (id, name, description, created_at) VALUES (?, ?, ?, ?)')

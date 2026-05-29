@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogIn, LogOut, UserRound } from 'lucide-react';
 import {
   getAuthStatus,
-  getSessionToken,
+  getStoredSessionToken,
   initAuthListener,
   signOut,
 } from '../lib/auth.js';
@@ -12,7 +12,7 @@ import './LoginButton.css';
 export default function LoginButton() {
   const menuRef = useRef(null);
   const [authState, setAuthState] = useState(() => ({
-    authenticated: Boolean(getSessionToken()),
+    authenticated: Boolean(getStoredSessionToken()),
     userId: null,
     email: null,
   }));

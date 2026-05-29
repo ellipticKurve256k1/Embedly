@@ -26,12 +26,16 @@ export function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function getSessionTokenSync() {
+export function getStoredSessionToken() {
   try {
     return window.localStorage.getItem('embeddly_session_token');
   } catch {
     return null;
   }
+}
+
+function getSessionTokenSync() {
+  return getStoredSessionToken();
 }
 
 export function setSessionToken(token) {
@@ -93,10 +97,18 @@ export async function signOut() {
 
 export async function getAuthStatus() {
   const client = getClient();
-  if (!client) return { authenticated: false };
+  if (!client) {
+    clearSessionToken();
+    return { authenticated: false };
+  }
 
   const { data: { session }, error } = await client.auth.getSession();
-  if (error || !session) return { authenticated: false };
+  if (error || !session) {
+    clearSessionToken();
+    return { authenticated: false };
+  }
+
+  setSessionToken(session.access_token);
 
   return {
     authenticated: true,
