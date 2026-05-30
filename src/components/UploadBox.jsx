@@ -79,6 +79,20 @@ function shouldAutoKeepInKnowledgeBase(view) {
   return view.statusGroup === 'completed' || view.statusGroup === 'embedding';
 }
 
+const STATUS_GROUP_ORDER = {
+  pending: 0,
+  failed: 1,
+  embedding: 2,
+  completed: 3,
+};
+
+function sortByEmbeddingStatus(a, b) {
+  const orderA = STATUS_GROUP_ORDER[a.statusGroup] ?? 4;
+  const orderB = STATUS_GROUP_ORDER[b.statusGroup] ?? 4;
+  if (orderA !== orderB) return orderA - orderB;
+  return a.document.filename.localeCompare(b.document.filename);
+}
+
 function formatFileList(files) {
   return files.map((file) => ({
     id: `${file.name}-${file.size}-${file.lastModified}`,
@@ -393,13 +407,13 @@ export default function UploadBox({ projects = [] }) {
   const allRightViews = useMemo(() => (
     documentViews
       .filter((view) => knowledgeBaseIds.has(view.document.id))
-      .sort((a, b) => a.document.filename.localeCompare(b.document.filename))
+      .sort(sortByEmbeddingStatus)
   ), [documentViews, knowledgeBaseIds]);
 
   const rightViews = useMemo(() => (
     scopedDocumentViews
       .filter((view) => knowledgeBaseIds.has(view.document.id))
-      .sort((a, b) => a.document.filename.localeCompare(b.document.filename))
+      .sort(sortByEmbeddingStatus)
   ), [knowledgeBaseIds, scopedDocumentViews]);
 
   const visibleRightViews = useMemo(() => (
