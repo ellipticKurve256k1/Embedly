@@ -707,6 +707,57 @@ function RetrievalSettingsPanel({
     });
   };
 
+  const [rawMaxChunkSize, setRawMaxChunkSize] = useState(
+    String(chunkingConfig.maxChunkSize),
+  );
+  const [rawTargetTokens, setRawTargetTokens] = useState(
+    String(chunkingConfig.targetTokens),
+  );
+  const [rawMaxTokens, setRawMaxTokens] = useState(
+    String(chunkingConfig.maxTokens),
+  );
+  const [rawMinSize, setRawMinSize] = useState(
+    String(
+      chunkingConfig.strategy === 'fixed'
+        ? chunkingConfig.minChunkSize
+        : chunkingConfig.minTokens,
+    ),
+  );
+  const [rawCandidateLimit, setRawCandidateLimit] = useState(
+    String(rerankerConfig.candidateLimit),
+  );
+  const [rawTopK, setRawTopK] = useState(
+    String(rerankerConfig.topK),
+  );
+
+  useEffect(() => {
+    setRawMaxChunkSize(String(chunkingConfig.maxChunkSize));
+  }, [chunkingConfig.maxChunkSize]);
+
+  useEffect(() => {
+    setRawTargetTokens(String(chunkingConfig.targetTokens));
+  }, [chunkingConfig.targetTokens]);
+
+  useEffect(() => {
+    setRawMaxTokens(String(chunkingConfig.maxTokens));
+  }, [chunkingConfig.maxTokens]);
+
+  useEffect(() => {
+    const currentValue =
+      chunkingConfig.strategy === 'fixed'
+        ? chunkingConfig.minChunkSize
+        : chunkingConfig.minTokens;
+    setRawMinSize(String(currentValue));
+  }, [chunkingConfig.strategy, chunkingConfig.minChunkSize, chunkingConfig.minTokens]);
+
+  useEffect(() => {
+    setRawCandidateLimit(String(rerankerConfig.candidateLimit));
+  }, [rerankerConfig.candidateLimit]);
+
+  useEffect(() => {
+    setRawTopK(String(rerankerConfig.topK));
+  }, [rerankerConfig.topK]);
+
   return (
     <section className="settings-detail" aria-labelledby="retrieval-title">
       <div className="settings-detail-heading">
@@ -746,15 +797,17 @@ function RetrievalSettingsPanel({
               min="100"
               step="50"
               type="number"
-              value={chunkingConfig.maxChunkSize}
+              value={rawMaxChunkSize}
               onChange={(event) => {
                 const raw = event.target.value;
+                setRawMaxChunkSize(raw);
                 if (raw === '') return;
                 const parsed = parseInt(raw, 10);
                 if (!Number.isNaN(parsed)) {
                   updateConfig('maxChunkSize', parsed);
                 }
               }}
+              onBlur={() => setRawMaxChunkSize(String(chunkingConfig.maxChunkSize))}
             />
           </label>
         ) : (
@@ -768,15 +821,17 @@ function RetrievalSettingsPanel({
                 min="100"
                 step="25"
                 type="number"
-                value={chunkingConfig.targetTokens}
+                value={rawTargetTokens}
                 onChange={(event) => {
                   const raw = event.target.value;
+                  setRawTargetTokens(raw);
                   if (raw === '') return;
                   const parsed = parseInt(raw, 10);
                   if (!Number.isNaN(parsed)) {
                     updateConfig('targetTokens', parsed);
                   }
                 }}
+                onBlur={() => setRawTargetTokens(String(chunkingConfig.targetTokens))}
               />
             </label>
 
@@ -789,15 +844,17 @@ function RetrievalSettingsPanel({
                 min="100"
                 step="25"
                 type="number"
-                value={chunkingConfig.maxTokens}
+                value={rawMaxTokens}
                 onChange={(event) => {
                   const raw = event.target.value;
+                  setRawMaxTokens(raw);
                   if (raw === '') return;
                   const parsed = parseInt(raw, 10);
                   if (!Number.isNaN(parsed)) {
                     updateConfig('maxTokens', parsed);
                   }
                 }}
+                onBlur={() => setRawMaxTokens(String(chunkingConfig.maxTokens))}
               />
             </label>
           </>
@@ -816,11 +873,10 @@ function RetrievalSettingsPanel({
             min="1"
             step="10"
             type="number"
-            value={chunkingConfig.strategy === 'fixed'
-              ? chunkingConfig.minChunkSize
-              : chunkingConfig.minTokens}
+            value={rawMinSize}
             onChange={(event) => {
               const raw = event.target.value;
+              setRawMinSize(raw);
               if (raw === '') return;
               const parsed = parseInt(raw, 10);
               if (!Number.isNaN(parsed)) {
@@ -829,6 +885,13 @@ function RetrievalSettingsPanel({
                   parsed,
                 );
               }
+            }}
+            onBlur={() => {
+              const currentValue =
+                chunkingConfig.strategy === 'fixed'
+                  ? chunkingConfig.minChunkSize
+                  : chunkingConfig.minTokens;
+              setRawMinSize(String(currentValue));
             }}
           />
         </label>
@@ -914,15 +977,17 @@ function RetrievalSettingsPanel({
                 max="100"
                 step="1"
                 type="number"
-                value={rerankerConfig.candidateLimit}
+                value={rawCandidateLimit}
                 onChange={(event) => {
                   const raw = event.target.value;
+                  setRawCandidateLimit(raw);
                   if (raw === '') return;
                   const parsed = parseInt(raw, 10);
                   if (!Number.isNaN(parsed)) {
                     updateRerankerConfig('candidateLimit', parsed);
                   }
                 }}
+                onBlur={() => setRawCandidateLimit(String(rerankerConfig.candidateLimit))}
               />
             </label>
 
@@ -936,15 +1001,17 @@ function RetrievalSettingsPanel({
                 max="20"
                 step="1"
                 type="number"
-                value={rerankerConfig.topK}
+                value={rawTopK}
                 onChange={(event) => {
                   const raw = event.target.value;
+                  setRawTopK(raw);
                   if (raw === '') return;
                   const parsed = parseInt(raw, 10);
                   if (!Number.isNaN(parsed)) {
                     updateRerankerConfig('topK', parsed);
                   }
                 }}
+                onBlur={() => setRawTopK(String(rerankerConfig.topK))}
               />
             </label>
           </div>
@@ -1639,10 +1706,17 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
   const [rawThreshold, setRawThreshold] = useState(
     String(fields.matchThreshold ?? 0),
   );
+  const [rawDimensions, setRawDimensions] = useState(
+    String(dimensions),
+  );
 
   useEffect(() => {
     setRawThreshold(String(fields.matchThreshold ?? 0));
   }, [fields.matchThreshold]);
+
+  useEffect(() => {
+    setRawDimensions(String(dimensions));
+  }, [dimensions]);
 
   const updateField = (field, value) => {
     onFieldsChange((currentFields) => ({
@@ -1716,15 +1790,17 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
             max="4096"
             step="1"
             type="number"
-            value={dimensions}
+            value={rawDimensions}
             onChange={(event) => {
               const raw = event.target.value;
+              setRawDimensions(raw);
               if (raw === '') return;
               const parsed = parseInt(raw, 10);
               if (!Number.isNaN(parsed)) {
                 updateField('dimensions', parsed);
               }
             }}
+            onBlur={() => setRawDimensions(String(dimensions))}
           />
         </label>
 
