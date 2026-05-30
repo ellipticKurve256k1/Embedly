@@ -1,5 +1,6 @@
-import { Search } from 'lucide-react';
+import { FolderOpen, Search } from 'lucide-react';
 import FileTransferRow, { UploadingTransferRow } from './FileTransferRow.jsx';
+import './TransferPane.css';
 
 export default function TransferPane({
   title,
@@ -105,6 +106,7 @@ export default function TransferPane({
 
         {!isLoading && !hasRows && (
           <div className="transfer-empty-state">
+            <FolderOpen size={32} />
             <strong>{emptyTitle}</strong>
             <span>{emptyBody}</span>
           </div>

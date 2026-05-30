@@ -1,0 +1,65 @@
+.transfer-controls {
+  align-self: start;
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+  display: grid;
+  gap: 9px;
+}
+
+.transfer-control-button {
+  width: 42px;
+  height: 42px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #7368ff, #5144f1);
+  box-shadow: 0 10px 20px rgba(78, 65, 240, 0.2);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.transfer-control-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 24px rgba(78, 65, 240, 0.24);
+}
+
+.transfer-control-button:disabled {
+  color: #9aa4b8;
+  background: rgba(132, 146, 184, 0.16);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+@media (max-width: 1024px) {
+  .transfer-controls {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: center;
+    grid-auto-flow: column;
+  }
+}
+
+@media (max-width: 860px) {
+  .transfer-controls {
+    grid-auto-flow: column;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 680px) {
+  .transfer-controls {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .transfer-control-button {
+    width: 100%;
+  }
+}

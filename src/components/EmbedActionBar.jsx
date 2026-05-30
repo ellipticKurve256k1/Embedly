@@ -1,4 +1,5 @@
 import { LoaderCircle, RotateCcw, Sparkles } from 'lucide-react';
+import './EmbedActionBar.css';
 
 export default function EmbedActionBar({
   views,
@@ -17,15 +18,29 @@ export default function EmbedActionBar({
   });
   const actionableCount = counts.pending + counts.failed;
   const hasFailed = counts.failed > 0;
-  const summary = `${counts.pending} queued, ${counts.failed} failed, ${counts.completed} completed${
-    counts.embedding > 0 ? `, ${counts.embedding} embedding` : ''
-  } in Knowledge Base`;
 
   return (
-    <footer className="embed-action-bar" aria-live="polite">
+    <footer className="embed-action-bar">
       <div className="embed-action-summary">
         <strong>Knowledge Base</strong>
-        <span>{views.length > 0 ? summary : 'Move files into the Knowledge Base before embedding.'}</span>
+        {views.length > 0 ? (
+          <div className="embed-metrics">
+            {counts.pending > 0 && (
+              <span className="embed-metric is-pending">{counts.pending} Queued</span>
+            )}
+            {counts.failed > 0 && (
+              <span className="embed-metric is-failed">{counts.failed} Failed</span>
+            )}
+            {counts.completed > 0 && (
+              <span className="embed-metric is-completed">{counts.completed} Completed</span>
+            )}
+            {counts.embedding > 0 && (
+              <span className="embed-metric is-embedding">{counts.embedding} Embedding</span>
+            )}
+          </div>
+        ) : (
+          <span>Move files into the Knowledge Base before embedding.</span>
+        )}
       </div>
 
       <div className="embed-action-buttons">
@@ -46,9 +61,12 @@ export default function EmbedActionBar({
           onClick={onEmbed}
         >
           {isEmbedding ? <LoaderCircle size={16} /> : <Sparkles size={16} />}
-          <span>{isEmbedding ? 'Embedding' : 'Embed Pending & Retry Failed'}</span>
+          <span>{isEmbedding ? 'Embedding' : 'Embed All'}</span>
         </button>
       </div>
+      <span className="sr-only" aria-live="polite">
+        {isEmbedding ? 'Embedding in progress' : `${actionableCount} files ready to embed`}
+      </span>
     </footer>
   );
 }

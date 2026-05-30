@@ -1,4 +1,5 @@
 import { LoaderCircle, UploadCloud } from 'lucide-react';
+import './FileDropZone.css';
 
 export default function FileDropZone({
   inputRef,

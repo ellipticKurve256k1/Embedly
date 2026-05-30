@@ -10,8 +10,8 @@ import {
 import { useEmbedding } from '../lib/embeddingContext.jsx';
 import EmbedActionBar from './EmbedActionBar.jsx';
 import FileDropZone from './FileDropZone.jsx';
-import ProjectChip from './ProjectChip.jsx';
 import ProjectSelector from './ProjectSelector.jsx';
+import ProjectChip from './ProjectChip.jsx';
 import ScopeToggle, { UNASSIGNED_SCOPE_VALUE } from './ScopeToggle.jsx';
 import TransferControls from './TransferControls.jsx';
 import TransferPane from './TransferPane.jsx';
@@ -302,12 +302,6 @@ export default function UploadBox({ projects = [] }) {
     ? 'No project'
     : scopedProject?.name ?? 'All Documents';
   const batchProject = batchProjectId ? projectById.get(batchProjectId) ?? null : null;
-  const quickUploadProjects = useMemo(() => (
-    [...projects]
-      .sort((a, b) => Number(b.documentCount ?? 0) - Number(a.documentCount ?? 0))
-      .slice(0, 3)
-  ), [projects]);
-
   const documentViews = useMemo(() => (
     documents.map((document) => {
       const displayStatus = getDisplayStatus(document, embeddingDocumentIds, jobProgress);
@@ -321,28 +315,6 @@ export default function UploadBox({ projects = [] }) {
       };
     })
   ), [documents, embeddingDocumentIds, jobProgress, projectById]);
-
-  const projectSummary = useMemo(() => {
-    const countsByProjectId = new Map(projects.map((project) => [project.id, 0]));
-    let unassignedCount = 0;
-
-    documents.forEach((document) => {
-      if (document.projectId && countsByProjectId.has(document.projectId)) {
-        countsByProjectId.set(document.projectId, countsByProjectId.get(document.projectId) + 1);
-      } else {
-        unassignedCount += 1;
-      }
-    });
-
-    return {
-      totalCount: documents.length,
-      unassignedCount,
-      projectCounts: projects.map((project) => ({
-        ...project,
-        documentCount: countsByProjectId.get(project.id) ?? 0,
-      })),
-    };
-  }, [documents, projects]);
 
   useEffect(() => {
     if (
@@ -494,21 +466,28 @@ export default function UploadBox({ projects = [] }) {
   const handleFiles = useCallback(async (incoming) => {
     const accepted = [];
     const rejected = [];
+    const duplicates = [];
     const existingNames = new Set([
       ...documents.map((document) => document.filename),
       ...uploadingFiles.map((file) => file.name),
     ]);
 
     Array.from(incoming).forEach((file) => {
-      if (isAcceptedFile(file) && !existingNames.has(file.name)) {
-        accepted.push(file);
-      } else if (!isAcceptedFile(file)) {
+      if (!isAcceptedFile(file)) {
         rejected.push(file.name);
+      } else if (existingNames.has(file.name)) {
+        duplicates.push(file.name);
+      } else {
+        accepted.push(file);
       }
     });
 
     if (rejected.length > 0) {
       setErrorMessage(`Skipped unsupported files: ${rejected.join(', ')}`);
+    }
+
+    if (duplicates.length > 0) {
+      setErrorMessage(`Already exists: ${duplicates.join(', ')}`);
     }
 
     if (accepted.length === 0) {
@@ -731,7 +710,7 @@ export default function UploadBox({ projects = [] }) {
       setAssignmentNotice(`Assigned to ${targetName}.`);
       window.setTimeout(() => {
         setAssignmentNotice('');
-      }, 1500);
+      }, 4000);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to update selected projects.');
     }
@@ -808,29 +787,6 @@ export default function UploadBox({ projects = [] }) {
   return (
     <div className="upload-stage">
       <div className="upload-workspace">
-        <div className="upload-preassign-strip" aria-label="Project for new uploads">
-          <span>Assign new uploads</span>
-          <div className="upload-preassign-options">
-            <button
-              className={!uploadProjectId ? 'is-active' : ''}
-              type="button"
-              onClick={() => setUploadProjectId(null)}
-            >
-              <ProjectChip label="No project" state="unassigned" variant="compact" />
-            </button>
-            {quickUploadProjects.map((project) => (
-              <button
-                className={uploadProjectId === project.id ? 'is-active' : ''}
-                type="button"
-                key={project.id}
-                onClick={() => setUploadProjectId(project.id)}
-              >
-                <ProjectChip project={project} variant="compact" />
-              </button>
-            ))}
-          </div>
-        </div>
-
         <FileDropZone
           inputRef={inputRef}
           isDragOver={isDragOver}
@@ -887,53 +843,6 @@ export default function UploadBox({ projects = [] }) {
             )}
           </div>
 
-          <div className="upload-project-summary" aria-label="Project document summary">
-            <span className="upload-project-summary__label">Projects</span>
-            <button
-              className={`upload-project-summary__chip${!scopeProjectId ? ' is-active' : ''}`}
-              type="button"
-              aria-pressed={!scopeProjectId}
-              onClick={() => handleScopeProjectChange(null)}
-            >
-              <ProjectChip
-                label="All Documents"
-                documentCount={projectSummary.totalCount}
-                variant="compact"
-                showCount
-              />
-            </button>
-            {projectSummary.projectCounts.map((project) => (
-              <button
-                className={`upload-project-summary__chip${scopeProjectId === project.id ? ' is-active' : ''}`}
-                type="button"
-                aria-pressed={scopeProjectId === project.id}
-                key={project.id}
-                onClick={() => handleScopeProjectChange(project.id)}
-              >
-                <ProjectChip
-                  project={project}
-                  documentCount={project.documentCount}
-                  variant="compact"
-                  showCount
-                />
-              </button>
-            ))}
-            <button
-              className={`upload-project-summary__chip${scopeProjectId === UNASSIGNED_PROJECT_SCOPE ? ' is-active' : ''}`}
-              type="button"
-              aria-pressed={scopeProjectId === UNASSIGNED_PROJECT_SCOPE}
-              onClick={() => handleScopeProjectChange(UNASSIGNED_PROJECT_SCOPE)}
-            >
-              <ProjectChip
-                label="No project"
-                documentCount={projectSummary.unassignedCount}
-                state="unassigned"
-                variant="compact"
-                showCount
-                className={projectSummary.unassignedCount > 0 ? 'has-unassigned-count' : ''}
-              />
-            </button>
-          </div>
         </div>
 
         {errorMessage && (

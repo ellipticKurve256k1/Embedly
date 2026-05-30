@@ -1,7 +1,8 @@
-import { LoaderCircle, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, LoaderCircle, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import FileIcon from './FileIcon.jsx';
 import ProjectChip from './ProjectChip.jsx';
-import { UNASSIGNED_SCOPE_VALUE } from './ScopeToggle.jsx';
+import './FileTransferRow.css';
 
 const ACTIVE_STATUSES = new Set(['parsing', 'chunking', 'embedding', 'indexing']);
 
@@ -23,11 +24,16 @@ function getKnowledgeStatus(displayStatus) {
   return displayStatus === 'pending' ? 'queued' : displayStatus;
 }
 
-function StatusBadge({ status, error }) {
+function StatusBadge({ status, error, onClick }) {
   return (
-    <span className={`transfer-status-badge is-${status}`} title={error || status}>
+    <button
+      className={`transfer-status-badge is-${status}`}
+      type="button"
+      disabled={!onClick}
+      onClick={onClick}
+    >
       {status}
-    </span>
+    </button>
   );
 }
 
@@ -89,7 +95,6 @@ export default function FileTransferRow({
   onEmbed,
   isActionDisabled,
   projects = [],
-  projectScopeId = null,
   onProjectChange,
 }) {
   const { document, displayStatus, progress, project, statusGroup } = view;
@@ -101,9 +106,7 @@ export default function FileTransferRow({
   const showRetry = isKnowledge && statusGroup === 'failed';
   const checkboxLabel = `${isSelected ? 'Deselect' : 'Select'} ${document.filename}`;
   const errorMessage = document.error || progress?.error || '';
-  const isScopeMatch = !projectScopeId
-    || (projectScopeId === UNASSIGNED_SCOPE_VALUE && !document.projectId)
-    || document.projectId === projectScopeId;
+  const [isErrorExpanded, setIsErrorExpanded] = useState(false);
 
   return (
     <div
@@ -112,7 +115,6 @@ export default function FileTransferRow({
         `is-${displayStatus}`,
         isSelected ? 'is-selected' : '',
         !isSelectable ? 'is-disabled' : '',
-        projectScopeId ? isScopeMatch ? 'is-scope-match' : 'is-scope-mismatch' : '',
       ].filter(Boolean).join(' ')}
     >
       <label className="transfer-row-check">
@@ -147,7 +149,11 @@ export default function FileTransferRow({
           <ProgressStatus status={displayStatus} progress={progress} />
         ) : (
           <>
-            <StatusBadge status={knowledgeStatus} error={errorMessage} />
+            <StatusBadge
+              status={knowledgeStatus}
+              error={errorMessage}
+              onClick={showRetry ? () => setIsErrorExpanded((v) => !v) : undefined}
+            />
             {document.chunkCount > 0 && (
               <span className="transfer-chunk-count">{document.chunkCount} chunks</span>
             )}
@@ -175,7 +181,7 @@ export default function FileTransferRow({
 
         {(showRetry || showReembed) && (
           <button
-            className="transfer-row-action"
+            className={`transfer-row-action${showReembed ? ' is-reembed' : ''}`}
             type="button"
             disabled={isActionDisabled}
             aria-label={`${showRetry ? 'Retry' : 'Re-embed'} ${document.filename}`}
@@ -195,6 +201,13 @@ export default function FileTransferRow({
           <Trash2 size={14} />
         </button>
       </div>
+
+      {isErrorExpanded && errorMessage && (
+        <div className="transfer-row-error-detail">
+          <ChevronDown size={14} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
