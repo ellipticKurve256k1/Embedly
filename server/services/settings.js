@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { db, nowIso, SERVER_DIR } from '../db.js';
 import { DEFAULT_RERANKER_CONFIG } from './reranker.js';
+import { getSupabaseDataClient } from './supabase.js';
 
 export const SETTINGS_KEYS = {
   llm: 'llm.setup',
@@ -23,6 +24,34 @@ const KEY_PATH = path.join(KEY_DIR, 'key');
 const MASKED_API_KEY_PATTERN = /^.{1,7}\.\.\..{1,3}$/;
 
 let cachedEncryptionKey = null;
+let settingsSupabaseClientFactory = getSupabaseDataClient;
+
+function normalizeUserId(userId) {
+  return String(userId ?? '').trim();
+}
+
+function resolveUserAndKey(userIdOrKey, maybeKey) {
+  if (maybeKey === undefined) {
+    return { userId: '', storageKey: userIdOrKey };
+  }
+
+  return {
+    userId: normalizeUserId(userIdOrKey),
+    storageKey: maybeKey,
+  };
+}
+
+export function setSettingsSupabaseClientFactoryForTests(factory) {
+  settingsSupabaseClientFactory = factory ?? getSupabaseDataClient;
+}
+
+function getSettingsSupabaseClient(userId, authToken) {
+  if (!normalizeUserId(userId) || !authToken) {
+    return null;
+  }
+
+  return settingsSupabaseClientFactory(authToken);
+}
 
 export function resolveEncryptionKey() {
   if (cachedEncryptionKey) {
@@ -53,21 +82,28 @@ export function resolveEncryptionKey() {
   return cachedEncryptionKey;
 }
 
-function encryptSetting(plaintext) {
+export function resolveUserEncryptionKey(userId) {
+  return crypto
+    .createHmac('sha256', resolveEncryptionKey())
+    .update(`embeddly:user-settings:${normalizeUserId(userId)}`)
+    .digest();
+}
+
+export function encryptUserSetting(userId, plaintext) {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', resolveEncryptionKey(), iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', resolveUserEncryptionKey(userId), iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
 
   return Buffer.concat([iv, authTag, encrypted]).toString('base64');
 }
 
-function decryptSetting(ciphertext) {
+export function decryptUserSetting(userId, ciphertext) {
   const payload = Buffer.from(ciphertext, 'base64');
   const iv = payload.subarray(0, 12);
   const authTag = payload.subarray(12, 28);
   const encrypted = payload.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', resolveEncryptionKey(), iv);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', resolveUserEncryptionKey(userId), iv);
 
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
@@ -78,20 +114,17 @@ function shouldEncryptSetting(value) {
     value
       && typeof value === 'object'
       && !Array.isArray(value)
-      && (
-        Object.prototype.hasOwnProperty.call(value, 'apiKey')
-        || Object.prototype.hasOwnProperty.call(value, 'serviceRoleKey')
-      ),
+      && Object.prototype.hasOwnProperty.call(value, 'apiKey'),
   );
 }
 
-function parseSettingValue(row) {
+function parseSettingValue(userId, row) {
   if (!row) {
     return null;
   }
 
   try {
-    const json = row.encrypted ? decryptSetting(row.value) : row.value;
+    const json = row.encrypted ? decryptUserSetting(userId, row.value) : row.value;
     return JSON.parse(json);
   } catch {
     return null;
@@ -133,23 +166,10 @@ function toPublicSetting(publicKey, value) {
     };
   }
 
-  if (publicKey === 'vectorDb' && value.provider === 'supabase') {
-    const serviceRoleKey = String(value.serviceRoleKey ?? '').trim();
-    if (!serviceRoleKey) {
-      return value;
-    }
-
-    return {
-      ...value,
-      serviceRoleKey: maskApiKey(serviceRoleKey),
-      hasServiceRoleKey: true,
-    };
-  }
-
   return value;
 }
 
-function normalizeLlmSetup(value) {
+async function normalizeLlmSetup(userId, authToken, value) {
   const input = value && typeof value === 'object' ? value : {};
   const provider = input.provider === 'api' ? 'api' : 'ollama';
   const setup = {
@@ -159,7 +179,7 @@ function normalizeLlmSetup(value) {
   };
 
   if (provider === 'api') {
-    const previousSetup = getLlmSetup();
+    const previousSetup = await getLlmSetup(userId, authToken);
     const nextApiKey = String(input.apiKey ?? '').trim();
     const previousApiKey = String(previousSetup?.apiKey ?? '').trim();
 
@@ -215,34 +235,40 @@ function normalizeRerankerSetup(value) {
 function normalizeVectorDbSetup(value) {
   const input = value && typeof value === 'object' ? value : {};
   const provider = input.provider === 'supabase' ? 'supabase' : 'sqlite';
-  const setup = {
-    provider,
-    name: provider === 'supabase' ? 'Supabase' : 'SQLite',
-  };
 
-  if (provider === 'supabase') {
-    const previousSetup = getVectorDbSetup();
-    const nextServiceRoleKey = String(input.serviceRoleKey ?? '').trim();
-    const previousServiceRoleKey = String(previousSetup?.serviceRoleKey ?? '').trim();
-
-    setup.projectUrl = String(input.projectUrl ?? '').trim().replace(/\/+$/, '');
-    setup.table = String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks';
-    setup.dimensions = normalizeNumber(input.dimensions, 768, { min: 1, max: 4096 });
-    setup.matchThreshold = normalizeFloat(input.matchThreshold, 0, { min: 0, max: 1 });
-
-    if (nextServiceRoleKey && !isMaskedApiKey(nextServiceRoleKey)) {
-      setup.serviceRoleKey = nextServiceRoleKey;
-    } else if (previousServiceRoleKey) {
-      setup.serviceRoleKey = previousServiceRoleKey;
-    }
+  if (provider === 'sqlite') {
+    return { provider: 'sqlite', name: 'SQLite' };
   }
 
-  return setup;
+  return {
+    provider,
+    name: 'Supabase',
+    table: String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks',
+    dimensions: normalizeNumber(input.dimensions, 768, { min: 1, max: 4096 }),
+    matchThreshold: normalizeFloat(input.matchThreshold, 0, { min: 0, max: 1 }),
+  };
 }
 
-function normalizeSetting(publicKey, value) {
+function resolveDefaultVectorDbSetup() {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (supabaseUrl && supabaseKey) {
+    return {
+      provider: 'supabase',
+      name: 'Supabase',
+      table: 'embeddly_chunks',
+      dimensions: 768,
+      matchThreshold: 0,
+    };
+  }
+
+  return { provider: 'sqlite', name: 'SQLite' };
+}
+
+async function normalizeSetting(userId, authToken, publicKey, value) {
   if (publicKey === 'llm') {
-    return normalizeLlmSetup(value);
+    return normalizeLlmSetup(userId, authToken, value);
   }
 
   if (publicKey === 'reranker') {
@@ -256,39 +282,191 @@ function normalizeSetting(publicKey, value) {
   return value;
 }
 
-function getGlobalSettingRow(storageKey) {
-  return db.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get(storageKey);
+function getUserSettingRow(userId, storageKey) {
+  return db.prepare(`
+    SELECT value, encrypted
+    FROM user_settings
+    WHERE user_id = ? AND key = ?
+  `).get(normalizeUserId(userId), storageKey);
 }
 
-function getGlobalSettingsRows() {
-  return db.prepare('SELECT key, value, encrypted FROM settings').all();
+function getUserSettingsRows(userId) {
+  return db.prepare(`
+    SELECT key, value, encrypted
+    FROM user_settings
+    WHERE user_id = ?
+  `).all(normalizeUserId(userId));
 }
 
-export function getSetting(storageKey) {
-  return parseSettingValue(getGlobalSettingRow(storageKey));
+async function getRemoteSettingRow(userId, authToken, storageKey) {
+  const client = getSettingsSupabaseClient(userId, authToken);
+  if (!client) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from('user_settings')
+    .select('value, encrypted')
+    .eq('user_id', normalizeUserId(userId))
+    .eq('key', storageKey)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Unable to load Supabase setting: ${error.message}`);
+  }
+
+  return data ?? null;
 }
 
-export function setSetting(storageKey, value) {
+async function getRemoteSettingsRows(userId, authToken) {
+  const client = getSettingsSupabaseClient(userId, authToken);
+  if (!client) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from('user_settings')
+    .select('key, value, encrypted')
+    .eq('user_id', normalizeUserId(userId));
+
+  if (error) {
+    throw new Error(`Unable to load Supabase settings: ${error.message}`);
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function upsertRemoteSetting(userId, authToken, storageKey, value, encrypted) {
+  const client = getSettingsSupabaseClient(userId, authToken);
+  if (!client) {
+    return false;
+  }
+
+  const { error } = await client
+    .from('user_settings')
+    .upsert({
+      user_id: normalizeUserId(userId),
+      key: storageKey,
+      value,
+      encrypted: Boolean(encrypted),
+      updated_at: nowIso(),
+    }, { onConflict: 'user_id,key' });
+
+  if (error) {
+    throw new Error(`Unable to save Supabase setting: ${error.message}`);
+  }
+
+  return true;
+}
+
+async function deleteRemoteSetting(userId, authToken, storageKey) {
+  const client = getSettingsSupabaseClient(userId, authToken);
+  if (!client) {
+    return false;
+  }
+
+  const { error } = await client
+    .from('user_settings')
+    .delete()
+    .eq('user_id', normalizeUserId(userId))
+    .eq('key', storageKey);
+
+  if (error) {
+    throw new Error(`Unable to delete Supabase setting: ${error.message}`);
+  }
+
+  return true;
+}
+
+async function migrateLocalSettingsToSupabase(userId, authToken, remoteRows) {
+  const normalizedUserId = normalizeUserId(userId);
+  const client = getSettingsSupabaseClient(normalizedUserId, authToken);
+  if (!client || !normalizedUserId) {
+    return;
+  }
+
+  const localRows = getUserSettingsRows(normalizedUserId);
+  if (localRows.length === 0) {
+    return;
+  }
+
+  const remoteKeys = new Set(remoteRows.map((row) => row.key));
+  const rowsToMigrate = localRows.filter((row) => !remoteKeys.has(row.key));
+  if (rowsToMigrate.length === 0) {
+    return;
+  }
+
+  const { error } = await client
+    .from('user_settings')
+    .upsert(rowsToMigrate.map((row) => ({
+      user_id: normalizedUserId,
+      key: row.key,
+      value: row.value,
+      encrypted: Boolean(row.encrypted),
+      updated_at: nowIso(),
+    })), { onConflict: 'user_id,key' });
+
+  if (error) {
+    throw new Error(`Unable to migrate local settings to Supabase: ${error.message}`);
+  }
+
+  remoteRows.push(...rowsToMigrate);
+}
+
+export async function getSetting(userIdOrKey, maybeKey, authToken = null) {
+  const { userId, storageKey } = resolveUserAndKey(userIdOrKey, maybeKey);
+  if (userId && authToken) {
+    const remoteRow = await getRemoteSettingRow(userId, authToken, storageKey);
+    if (remoteRow) {
+      return parseSettingValue(userId, remoteRow);
+    }
+  }
+
+  return parseSettingValue(userId, getUserSettingRow(userId, storageKey));
+}
+
+export async function setSetting(userIdOrKey, keyOrValue, maybeValue, maybeAuthToken = null) {
+  const hasExplicitUserId = maybeValue !== undefined;
+  const userId = hasExplicitUserId ? normalizeUserId(userIdOrKey) : '';
+  const storageKey = hasExplicitUserId ? keyOrValue : userIdOrKey;
+  const value = hasExplicitUserId ? maybeValue : keyOrValue;
+  const authToken = hasExplicitUserId ? maybeAuthToken : null;
   const encrypted = shouldEncryptSetting(value) ? 1 : 0;
   const serializedValue = JSON.stringify(value);
-  const storedValue = encrypted ? encryptSetting(serializedValue) : serializedValue;
+  const storedValue = encrypted ? encryptUserSetting(userId, serializedValue) : serializedValue;
+
+  if (await upsertRemoteSetting(userId, authToken, storageKey, storedValue, encrypted)) {
+    return;
+  }
 
   db.prepare(`
-    INSERT INTO settings (key, value, encrypted, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET
+    INSERT INTO user_settings (user_id, key, value, encrypted, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, key) DO UPDATE SET
       value = excluded.value,
       encrypted = excluded.encrypted,
       updated_at = excluded.updated_at
-  `).run(storageKey, storedValue, encrypted, nowIso());
+  `).run(userId, storageKey, storedValue, encrypted, nowIso());
 }
 
-export function deleteSetting(storageKey) {
-  db.prepare('DELETE FROM settings WHERE key = ?').run(storageKey);
+export async function deleteSetting(userIdOrKey, maybeKey, authToken = null) {
+  const { userId, storageKey } = resolveUserAndKey(userIdOrKey, maybeKey);
+  if (await deleteRemoteSetting(userId, authToken, storageKey)) {
+    return;
+  }
+
+  db.prepare('DELETE FROM user_settings WHERE user_id = ? AND key = ?')
+    .run(userId, storageKey);
 }
 
-export function getAllSettings() {
-  const rows = getGlobalSettingsRows();
+export async function getAllSettings(userId = '', authToken = null) {
+  const normalizedUserId = normalizeUserId(userId);
+  const remoteRows = await getRemoteSettingsRows(normalizedUserId, authToken);
+  if (remoteRows) {
+    await migrateLocalSettingsToSupabase(normalizedUserId, authToken, remoteRows);
+  }
+
+  const rows = remoteRows ?? getUserSettingsRows(normalizedUserId);
   const settings = {};
 
   for (const row of rows) {
@@ -297,7 +475,7 @@ export function getAllSettings() {
       continue;
     }
 
-    const value = parseSettingValue(row);
+    const value = parseSettingValue(normalizedUserId, row);
     if (value !== null) {
       settings[publicKey] = value;
     }
@@ -306,8 +484,11 @@ export function getAllSettings() {
   return settings;
 }
 
-export function getAllPublicSettings() {
-  const settings = getAllSettings();
+export async function getAllPublicSettings(userId = '', authToken = null) {
+  const settings = await getAllSettings(userId, authToken);
+  if (!settings.vectorDb) {
+    settings.vectorDb = resolveDefaultVectorDbSetup();
+  }
 
   return Object.fromEntries(
     Object.entries(settings).map(([publicKey, value]) => [
@@ -317,16 +498,26 @@ export function getAllPublicSettings() {
   );
 }
 
-export function getPublicSetting(publicKey) {
+export async function getPublicSetting(userIdOrPublicKey, maybePublicKey, authToken = null) {
+  const publicKey = maybePublicKey === undefined ? userIdOrPublicKey : maybePublicKey;
+  const userId = maybePublicKey === undefined ? '' : normalizeUserId(userIdOrPublicKey);
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
+
   if (!storageKey) {
     return undefined;
   }
 
-  return toPublicSetting(publicKey, getSetting(storageKey));
+  if (publicKey === 'vectorDb') {
+    return toPublicSetting(publicKey, (await getSetting(userId, storageKey, authToken)) ?? resolveDefaultVectorDbSetup());
+  }
+
+  return toPublicSetting(publicKey, await getSetting(userId, storageKey, authToken));
 }
 
-export function savePublicSettings(settings) {
+export async function savePublicSettings(userIdOrSettings, maybeSettings, authToken = null) {
+  const hasExplicitUserId = maybeSettings !== undefined;
+  const userId = hasExplicitUserId ? normalizeUserId(userIdOrSettings) : '';
+  const settings = hasExplicitUserId ? maybeSettings : userIdOrSettings;
   const input = settings && typeof settings === 'object' ? settings : {};
 
   for (const [publicKey, value] of Object.entries(input)) {
@@ -336,43 +527,46 @@ export function savePublicSettings(settings) {
     }
 
     if (value === null) {
-      deleteSetting(storageKey);
+      await deleteSetting(userId, storageKey, authToken);
       continue;
     }
 
-    setSetting(storageKey, normalizeSetting(publicKey, value));
+    await setSetting(userId, storageKey, await normalizeSetting(userId, authToken, publicKey, value), authToken);
   }
 
-  return getAllPublicSettings();
+  return getAllPublicSettings(userId, authToken);
 }
 
-export function deletePublicSetting(publicKey) {
+export async function deletePublicSetting(userIdOrPublicKey, maybePublicKey, authToken = null) {
+  const publicKey = maybePublicKey === undefined ? userIdOrPublicKey : maybePublicKey;
+  const userId = maybePublicKey === undefined ? '' : normalizeUserId(userIdOrPublicKey);
   const storageKey = PUBLIC_SETTING_KEYS.get(publicKey);
+
   if (!storageKey) {
     return false;
   }
 
-  deleteSetting(storageKey);
+  await deleteSetting(userId, storageKey, authToken);
   return true;
 }
 
-export function getLlmSetup() {
-  return getSetting(SETTINGS_KEYS.llm);
+export async function getLlmSetup(userId = '', authToken = null) {
+  return getSetting(userId, SETTINGS_KEYS.llm, authToken);
 }
 
-export function getEmbeddingSetup() {
-  return getSetting(SETTINGS_KEYS.embedding);
+export async function getEmbeddingSetup(userId = '', authToken = null) {
+  return getSetting(userId, SETTINGS_KEYS.embedding, authToken);
 }
 
-export function getChunkingConfig() {
-  return getSetting(SETTINGS_KEYS.chunking);
+export async function getChunkingConfig(userId = '', authToken = null) {
+  return getSetting(userId, SETTINGS_KEYS.chunking, authToken);
 }
 
-export function getVectorDbSetup() {
-  return getSetting(SETTINGS_KEYS.vectorDb);
+export async function getVectorDbSetup(userId = '', authToken = null) {
+  return getSetting(userId, SETTINGS_KEYS.vectorDb, authToken);
 }
 
-export function getRerankerSetup() {
-  const setting = getSetting(SETTINGS_KEYS.reranker);
+export async function getRerankerSetup(userId = '', authToken = null) {
+  const setting = await getSetting(userId, SETTINGS_KEYS.reranker, authToken);
   return setting ? normalizeRerankerSetup(setting) : null;
 }

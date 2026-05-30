@@ -17,30 +17,38 @@ function normalizeProjectId(value) {
   return projectId || null;
 }
 
+function getRequestUserId(request) {
+  return String(request.userId ?? '').trim();
+}
+
 router.get('/', (request, response) => {
   const projectId = normalizeProjectId(request.query.projectId);
+  const userId = getRequestUserId(request);
 
   if (projectId) {
-    if (!getProjectById(projectId)) {
+    if (!getProjectById(userId, projectId)) {
       response.status(404).json({ error: 'Project not found.' });
       return;
     }
 
-    response.json({ documents: getDocumentsByProject(projectId) });
+    response.json({ documents: getDocumentsByProject(userId, projectId) });
     return;
   }
 
   const rows = db.prepare(`
     SELECT *
     FROM documents
+    WHERE user_id = ?
     ORDER BY created_at DESC
-  `).all();
+  `).all(userId);
 
   response.json({ documents: rows.map(toPublicDocument) });
 });
 
 router.get('/:id', (request, response) => {
-  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(request.params.id);
+  const userId = getRequestUserId(request);
+  const document = db.prepare('SELECT * FROM documents WHERE user_id = ? AND id = ?')
+    .get(userId, request.params.id);
 
   if (!document) {
     response.status(404).json({ error: 'Document not found.' });
@@ -62,25 +70,29 @@ router.get('/:id', (request, response) => {
 
 router.patch('/:id', (request, response) => {
   const projectId = normalizeProjectId(request.body?.projectId);
+  const userId = getRequestUserId(request);
 
-  if (projectId && !getProjectById(projectId)) {
+  if (projectId && !getProjectById(userId, projectId)) {
     response.status(404).json({ error: 'Project not found.' });
     return;
   }
 
-  const updated = updateDocumentProject(request.params.id, projectId);
+  const updated = updateDocumentProject(userId, request.params.id, projectId);
 
   if (!updated) {
     response.status(404).json({ error: 'Document not found.' });
     return;
   }
 
-  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(request.params.id);
+  const document = db.prepare('SELECT * FROM documents WHERE user_id = ? AND id = ?')
+    .get(userId, request.params.id);
   response.json({ document: toPublicDocument(document) });
 });
 
 router.delete('/:id', async (request, response) => {
-  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(request.params.id);
+  const userId = getRequestUserId(request);
+  const document = db.prepare('SELECT * FROM documents WHERE user_id = ? AND id = ?')
+    .get(userId, request.params.id);
 
   if (!document) {
     response.status(404).json({ error: 'Document not found.' });
@@ -88,7 +100,8 @@ router.delete('/:id', async (request, response) => {
   }
 
   try {
-    await getVectorStore().clearDocumentIndex(document.id);
+    const vectorStore = await getVectorStore(userId, { accessToken: request.authToken });
+    await vectorStore.clearDocumentIndex(document.id);
   } catch (error) {
     response.status(500).json({
       error: error instanceof Error ? error.message : 'Unable to clear vector index.',

@@ -89,6 +89,8 @@ export async function retrieveChunks(query, {
   topK,
   reranker = null,
   projectId = null,
+  userId = '',
+  accessToken = null,
 } = {}) {
   const trimmedQuery = String(query ?? '').trim();
   const normalizedProjectId = String(projectId ?? '').trim() || null;
@@ -106,7 +108,7 @@ export async function retrieveChunks(query, {
     )
     : finalLimit;
   const queryVector = Float32Array.from(await embedText(trimmedQuery, model));
-  const vectorStore = getVectorStore();
+  const vectorStore = await getVectorStore(userId, { accessToken });
   const candidates = (await vectorStore.retrieveChunks({
     queryVector,
     model,

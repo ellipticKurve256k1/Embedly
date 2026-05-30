@@ -110,21 +110,15 @@ test('normalizeVectorDbSetup returns SQLite default for unknown provider', () =>
 test('normalizeVectorDbSetup normalizes Supabase fields', () => {
   assert.deepEqual(normalizeVectorDbSetup({
     provider: 'supabase',
-    projectUrl: 'https://test.supabase.co/',
-    serviceRoleKey: 'secret',
     table: '',
     dimensions: 99999,
     matchThreshold: -1,
-    hasServiceRoleKey: true,
   }), {
     provider: 'supabase',
     name: 'Supabase',
-    projectUrl: 'https://test.supabase.co',
-    serviceRoleKey: 'secret',
     table: 'embeddly_chunks',
     dimensions: 4096,
     matchThreshold: 0,
-    hasServiceRoleKey: true,
   });
 });
 

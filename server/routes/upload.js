@@ -62,11 +62,16 @@ function normalizeProjectId(value) {
   return projectId || null;
 }
 
+function getRequestUserId(request) {
+  return String(request.userId ?? '').trim();
+}
+
 router.post('/', upload.array('files'), async (request, response) => {
   const files = request.files ?? [];
   const projectId = normalizeProjectId(request.body?.projectId);
+  const userId = getRequestUserId(request);
 
-  if (projectId && !getProjectById(projectId)) {
+  if (projectId && !getProjectById(userId, projectId)) {
     await removeUploadedFiles(files);
     response.status(404).json({ error: 'Project not found.' });
     return;
@@ -75,9 +80,10 @@ router.post('/', upload.array('files'), async (request, response) => {
   const createdAt = nowIso();
   const documents = files.map((file) => {
     const id = uuidv4();
-    const document = {
-      id,
-      filename: normalizeFilename(file.originalname),
+      const document = {
+        id,
+        userId,
+        filename: normalizeFilename(file.originalname),
       storedFilename: file.filename,
       mimeType: file.mimetype,
       sizeBytes: file.size,

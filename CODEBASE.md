@@ -1,10 +1,10 @@
 # Embeddly Codebase
 
-Last updated: 2026-05-27
+Last updated: 2026-05-29
 
 ## 1. Overview
 
-Embeddly is a local-first RAG knowledge search system. Users upload private documents, group them into projects, embed parsed chunks, search semantically, and chat with retrieved context scoped to all documents or one selected project. Generation can use local Ollama models or an OpenAI-compatible external API. Settings are persisted server-side in SQLite, with API keys encrypted at rest. Optional Supabase Auth lets users sign in with email, magic link, or OAuth providers.
+Embeddly is a RAG knowledge search system. Users upload private documents, group them into projects, embed parsed chunks, search semantically, and chat with retrieved context scoped to all documents or one selected project. Generation can use local Ollama models or an OpenAI-compatible external API. Documents, projects, and settings are scoped by authenticated Supabase user ID, with anonymous fallback rows stored under the empty user ID. API keys are encrypted at rest with per-user derived AES-256-GCM keys.
 
 ## 2. Technology Stack
 
@@ -17,7 +17,7 @@ Embeddly is a local-first RAG knowledge search system. Users upload private docu
 | File upload | `multer` |
 | Document parsing | Local parser service with PDF, CSV, text, and Markdown support |
 | Embedding provider | Ollama embeddings API |
-| Vector database | SQLite by default, optional Supabase pgvector through Data API and RPC |
+| Vector database | Supabase pgvector when Supabase env vars are configured, otherwise SQLite fallback |
 | Optional reranker | Transformers.js local cross-encoder |
 | LLM provider | Ollama chat API or OpenAI-compatible `/v1/chat/completions` |
 | Icons | `lucide-react` |
@@ -66,7 +66,7 @@ Generated or local runtime data:
 - Mode switching is local React state: chat, upload, and search. Chat and search are guarded in the UI until embedding, generation, and vector DB settings are available; upload remains accessible.
 - `src/lib/api.js` wraps backend calls and SSE parsing.
 - `src/lib/storage.js` loads settings from `/api/settings`, caches them in memory, migrates old Embeddly localStorage settings, and exposes synchronous read helpers.
-- `src/lib/auth.js` stores the LNURL-Auth session token in localStorage, injects `Authorization` headers, and emits auth-change events.
+- `src/lib/auth.js` manages Supabase Auth sessions, stores the current access token for API headers, and emits auth-change events.
 - `src/lib/chatDB.js` persists chat conversations and active chat UI state in IndexedDB, with an in-memory fallback when browser storage is unavailable.
 - There is no external frontend state library.
 
@@ -127,12 +127,12 @@ Long-running embedding work is queued by `/api/embed` and processed by an in-pro
 
 | Table | Purpose |
 |-------|---------|
-| `projects` | Named document groups used to scope chat and search retrieval. |
-| `documents` | Uploaded files, stored filenames, MIME type, size, status, error, chunk count, timestamps. |
+| `projects` | User-scoped named document groups used to scope chat and search retrieval. |
+| `documents` | User-scoped uploaded files, stored filenames, MIME type, size, status, error, chunk count, timestamps. |
 | `chunks` | Parsed document chunks with document id, chunk index, content, token count, timestamp. |
 | `embeddings` | Local SQLite vector BLOBs linked to chunks, used when SQLite VectorDB is active. |
 | `embedding_jobs` | Per-document embedding status, model, total chunks, processed chunks, error, timestamps. |
-| `settings` | Key-value settings rows with JSON value, encryption flag, and update timestamp. |
+| `user_settings` | Local anonymous fallback settings and migration source for older authenticated local settings. |
 
 Chat conversations are not stored in SQLite. The browser stores up to 30 conversations in IndexedDB under the `embeddly-chat` database, and each saved conversation keeps up to 30 messages.
 
@@ -143,7 +143,7 @@ Important relationships:
 - `embedding_jobs.document_id` references `documents.id` with cascade delete.
 - `documents.project_id` references `projects.id` with `ON DELETE SET NULL`.
 
-All settings are stored globally in the `settings` table of `embedly.db`.
+Authenticated settings are stored in Supabase `public.user_settings` with primary key `(user_id, key)` and RLS ownership through `auth.uid() = user_id`. Anonymous fallback settings remain in local SQLite `user_settings` with `user_id = ''`. Values containing `apiKey` are encrypted by the Express server with a key derived from the server KEK and user ID before being stored.
 
 Settings keys:
 
@@ -152,7 +152,7 @@ Settings keys:
 | `llm.setup` | `llm` | Yes, when `apiKey` is present. |
 | `embedding.setup` | `embedding` | No |
 | `chunking.config` | `chunking` | No |
-| `vector_db.setup` | `vectorDb` | Yes, when Supabase `serviceRoleKey` is present. |
+| `vector_db.setup` | `vectorDb` | No; Supabase project credentials come from environment variables. |
 | `reranker.setup` | `reranker` | No |
 
 ## 7. API Endpoints
@@ -218,9 +218,10 @@ User submits query
 ```
 
 SQLite VectorDB stores vectors in the local `embeddings` table and ranks with in-process cosine
-similarity. Supabase VectorDB stores vectors in the configured remote table and retrieves candidates
-through the `match_embeddly_chunks` RPC function. Chunk content remains in SQLite for document views,
-job tracking, and adjacent context.
+similarity. Supabase VectorDB is auto-selected when `SUPABASE_URL`/`SUPABASE_ANON_KEY` or Vite
+equivalents are configured; it stores vectors in `embeddly_chunks`, writes `user_id`, and retrieves
+candidates through `match_embeddly_chunks(match_user_id => request.userId::uuid)`. Server Supabase
+Data API calls use the verified bearer token so Supabase RLS can enforce `auth.uid() = user_id`.
 
 Chat:
 
@@ -247,9 +248,9 @@ App starts
   -> old localStorage settings migrate if server values are missing
   -> settings cache updates in memory
   -> SettingsPage saves through POST /api/settings
-  -> anonymous saves write to embedly.db settings
-  -> authenticated saves write to cred.sqlite user_settings
-  -> API keys are encrypted in SQLite and masked in responses
+  -> anonymous saves write to local user_settings with user_id = ''
+  -> authenticated saves write to Supabase public.user_settings with request.userId
+  -> API keys are encrypted with a per-user derived key and masked in responses
 ```
 
 Projects:
@@ -385,5 +386,6 @@ Test files live next to the source they cover, such as `server/services/chunker.
 No `.env` file is required for basic local development. User-facing model, retrieval, generation, and vector database settings are configurable through the Settings page and stored in SQLite. Supabase Auth is optional; when Supabase environment variables are not set, the app runs in anonymous mode.
 
 Supabase VectorDB requires applying `references/supabase-vector-schema.sql` in the Supabase SQL
-editor before saving the provider switch. The SQL uses `VECTOR(768)` by default; recreate the table
-and RPC function with the correct dimension when using a model with a different embedding size.
+editor before embedding documents against Supabase. The SQL uses `VECTOR(768)` by default; recreate
+the table and RPC function with the correct dimension when using a model with a different embedding
+size.

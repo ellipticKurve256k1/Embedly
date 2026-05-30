@@ -18,12 +18,16 @@ function createMockClient({ data = [], error = null, calls = [] } = {}) {
         },
         delete() {
           calls.push(['delete']);
-          return {
+          const chain = {
             eq(column, value) {
               calls.push(['eq', column, value]);
-              return { data, error };
+              return chain;
+            },
+            then(resolve) {
+              return Promise.resolve({ data, error }).then(resolve);
             },
           };
+          return chain;
         },
         insert(row) {
           calls.push(['insert', row]);
@@ -38,24 +42,11 @@ function createMockClient({ data = [], error = null, calls = [] } = {}) {
   };
 }
 
-test('createSupabaseVectorStore rejects missing project URL', () => {
-  assert.throws(() => createSupabaseVectorStore({ projectUrl: '' }), /project URL/i);
-});
-
-test('createSupabaseVectorStore rejects missing service role key', () => {
-  assert.throws(() => createSupabaseVectorStore({
-    projectUrl: 'https://test.supabase.co',
-    serviceRoleKey: '',
-  }), /service role key/i);
-});
-
 test('indexChunk validates vector dimensions before client calls', async () => {
   const calls = [];
   const store = createSupabaseVectorStore({
-    projectUrl: 'https://test.supabase.co',
-    serviceRoleKey: 'test-key',
     dimensions: 768,
-  }, {
+  }, 'user-1', {
     clientFactory: () => createMockClient({ calls }),
   });
 
@@ -69,10 +60,8 @@ test('indexChunk validates vector dimensions before client calls', async () => {
 test('testConnection validates table access', async () => {
   const calls = [];
   const store = createSupabaseVectorStore({
-    projectUrl: 'https://test.supabase.co',
-    serviceRoleKey: 'test-key',
     table: 'embeddly_chunks',
-  }, {
+  }, 'user-1', {
     clientFactory: () => createMockClient({ calls }),
   });
 
@@ -84,13 +73,60 @@ test('testConnection validates table access', async () => {
   ]);
 });
 
+test('clearDocumentIndex scopes deletes by user id', async () => {
+  const calls = [];
+  const store = createSupabaseVectorStore({ table: 'embeddly_chunks' }, 'user-1', {
+    clientFactory: () => createMockClient({ calls }),
+  });
+
+  await store.clearDocumentIndex('doc-1');
+
+  assert.deepEqual(calls, [
+    ['from', 'embeddly_chunks'],
+    ['delete'],
+    ['eq', 'document_id', 'doc-1'],
+    ['eq', 'user_id', 'user-1'],
+  ]);
+});
+
+test('indexChunk includes user id in inserted row', async () => {
+  const calls = [];
+  const store = createSupabaseVectorStore({ dimensions: 3 }, 'user-1', {
+    clientFactory: () => createMockClient({ calls }),
+  });
+
+  await store.indexChunk({
+    document: {
+      id: 'doc-1',
+      filename: 'doc.txt',
+      mime_type: 'text/plain',
+      size_bytes: 12,
+      project_id: null,
+      project_name: null,
+      created_at: '2026-05-21T00:00:00.000Z',
+      chunk_count: 1,
+    },
+    chunk: {
+      id: 'chunk-1',
+      idx: 0,
+      content: 'hello',
+      tokenCount: 2,
+    },
+    vector: new Float32Array([0.1, 0.2, 0.3]),
+    model: 'nomic',
+  });
+
+  const insertCall = calls.find((call) => call[0] === 'insert');
+  assert.equal(insertCall[1].user_id, 'user-1');
+});
+
 test('retrieveChunks normalizes RPC results to public chunk shape', async () => {
+  const calls = [];
   const store = createSupabaseVectorStore({
-    projectUrl: 'https://test.supabase.co',
-    serviceRoleKey: 'test-key',
     dimensions: 3,
-  }, {
+  }, 'user-1', {
     clientFactory: () => createMockClient({
+      calls,
       data: [{
         chunk_id: 'chunk-1',
         chunk_index: 0,
@@ -120,4 +156,6 @@ test('retrieveChunks normalizes RPC results to public chunk shape', async () => 
   assert.equal(results[0].documentName, 'doc.txt');
   assert.equal(results[0].score, 0.91);
   assert.equal(results[0].previousChunk, null);
+  const rpcCall = calls.find((call) => call[0] === 'rpc');
+  assert.equal(rpcCall[2].match_user_id, 'user-1');
 });

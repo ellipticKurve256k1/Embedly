@@ -25,8 +25,12 @@ function isUniqueConstraintError(error) {
     || String(error?.message ?? '').includes('UNIQUE constraint failed');
 }
 
-router.get('/', (_request, response) => {
-  response.json({ projects: listProjects() });
+function getRequestUserId(request) {
+  return String(request.userId ?? '').trim();
+}
+
+router.get('/', (request, response) => {
+  response.json({ projects: listProjects(getRequestUserId(request)) });
 });
 
 router.post('/', (request, response) => {
@@ -40,6 +44,7 @@ router.post('/', (request, response) => {
   try {
     const project = insertProject({
       id: uuidv4(),
+      userId: getRequestUserId(request),
       name,
       description: normalizeProjectDescription(request.body?.description),
       createdAt: new Date().toISOString(),
@@ -80,7 +85,7 @@ router.patch('/:id', (request, response) => {
   }
 
   try {
-    const project = updateProject(request.params.id, updates);
+    const project = updateProject(getRequestUserId(request), request.params.id, updates);
 
     if (!project) {
       response.status(404).json({ error: 'Project not found.' });
@@ -99,7 +104,7 @@ router.patch('/:id', (request, response) => {
 });
 
 router.delete('/:id', (request, response) => {
-  const deleted = deleteProject(request.params.id);
+  const deleted = deleteProject(getRequestUserId(request), request.params.id);
 
   if (!deleted) {
     response.status(404).json({ error: 'Project not found.' });
@@ -110,14 +115,14 @@ router.delete('/:id', (request, response) => {
 });
 
 router.get('/:id/documents', (request, response) => {
-  const project = getProjectById(request.params.id);
+  const project = getProjectById(getRequestUserId(request), request.params.id);
 
   if (!project) {
     response.status(404).json({ error: 'Project not found.' });
     return;
   }
 
-  response.json({ documents: getDocumentsByProject(project.id) });
+  response.json({ documents: getDocumentsByProject(getRequestUserId(request), project.id) });
 });
 
 export default router;

@@ -186,21 +186,21 @@ export function normalizeRerankerSetup(setup = {}) {
 export function normalizeVectorDbSetup(setup = {}) {
   const input = setup && typeof setup === 'object' ? setup : {};
   const provider = input.provider === 'supabase' ? 'supabase' : 'sqlite';
-  const result = {
-    provider,
-    name: provider === 'supabase' ? 'Supabase' : 'SQLite',
-  };
 
-  if (provider === 'supabase') {
-    result.projectUrl = String(input.projectUrl ?? '').trim().replace(/\/+$/, '');
-    result.table = String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks';
-    result.dimensions = Math.max(1, Math.min(4096, coerceInteger(input.dimensions, 768)));
-    result.matchThreshold = Math.max(0, Math.min(1, coerceNumber(input.matchThreshold, 0)));
-    result.serviceRoleKey = String(input.serviceRoleKey ?? '').trim();
-    result.hasServiceRoleKey = Boolean(input.hasServiceRoleKey);
+  if (provider === 'sqlite') {
+    return {
+      provider,
+      name: 'SQLite',
+    };
   }
 
-  return result;
+  return {
+    provider,
+    name: 'Supabase',
+    table: String(input.table ?? 'embeddly_chunks').trim() || 'embeddly_chunks',
+    dimensions: Math.max(1, Math.min(4096, coerceInteger(input.dimensions, 768))),
+    matchThreshold: Math.max(0, Math.min(1, coerceNumber(input.matchThreshold, 0))),
+  };
 }
 
 export async function loadSettings() {

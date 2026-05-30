@@ -1,7 +1,5 @@
 import express from 'express';
-import { getVectorDbSetup, isMaskedApiKey } from '../services/settings.js';
-import { createSqliteVectorStore } from '../services/vectorStores/sqliteVectorStore.js';
-import { createSupabaseVectorStore } from '../services/vectorStores/supabaseVectorStore.js';
+import { createVectorStore } from '../services/vectorStores/index.js';
 
 const router = express.Router();
 
@@ -10,19 +8,9 @@ router.post('/test-connection', async (request, response) => {
   const provider = setup.provider === 'supabase' ? 'supabase' : 'sqlite';
 
   try {
-    const previousSetup = getVectorDbSetup();
-    const requestedServiceRoleKey = String(setup.serviceRoleKey ?? '').trim();
-    const resolvedSetup = provider === 'supabase'
-      ? {
-        ...setup,
-        serviceRoleKey: requestedServiceRoleKey && !isMaskedApiKey(requestedServiceRoleKey)
-          ? requestedServiceRoleKey
-          : previousSetup?.serviceRoleKey,
-      }
-      : setup;
-    const vectorStore = provider === 'supabase'
-      ? createSupabaseVectorStore(resolvedSetup)
-      : createSqliteVectorStore();
+    const vectorStore = createVectorStore(request.userId ?? '', { ...setup, provider }, {
+      accessToken: request.authToken ?? null,
+    });
 
     await vectorStore.testConnection();
     response.json({

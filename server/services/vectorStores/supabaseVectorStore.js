@@ -1,8 +1,13 @@
+import { getSupabaseDataClient } from '../supabase.js';
 import { toPublicVectorChunk } from './publicChunk.js';
 
 const DEFAULT_TABLE = 'embeddly_chunks';
 const DEFAULT_DIMENSIONS = 768;
 const TABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function normalizeUserId(userId) {
+  return String(userId ?? '').trim();
+}
 
 function normalizeTableName(value) {
   const table = String(value ?? DEFAULT_TABLE).trim() || DEFAULT_TABLE;
@@ -34,50 +39,12 @@ function normalizeMatchThreshold(value) {
   return Math.max(0, Math.min(1, threshold));
 }
 
-function normalizeProjectUrl(value) {
-  const projectUrl = String(value ?? '').trim().replace(/\/+$/, '');
-
-  if (!projectUrl) {
-    throw new Error('Supabase project URL is required.');
+function requireClient(client) {
+  if (!client) {
+    throw new Error('Supabase VectorDB requires SUPABASE_URL and SUPABASE_ANON_KEY.');
   }
 
-  try {
-    const url = new URL(projectUrl);
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-      throw new Error();
-    }
-  } catch {
-    throw new Error('Supabase project URL must be a valid http(s) URL.');
-  }
-
-  return projectUrl;
-}
-
-async function createDefaultClient(projectUrl, serviceRoleKey) {
-  let module;
-
-  try {
-    module = await import('@supabase/supabase-js');
-  } catch {
-    throw new Error('Supabase support requires @supabase/supabase-js. Run npm install before using Supabase VectorDB.');
-  }
-
-  return module.createClient(projectUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-}
-
-function requireServiceRoleKey(value) {
-  const serviceRoleKey = String(value ?? '').trim();
-
-  if (!serviceRoleKey) {
-    throw new Error('Supabase service role key is required.');
-  }
-
-  return serviceRoleKey;
+  return client;
 }
 
 function normalizeRpcRow(row) {
@@ -98,21 +65,19 @@ function normalizeRpcRow(row) {
   };
 }
 
-export function createSupabaseVectorStore(setup = {}, { clientFactory = createDefaultClient } = {}) {
-  const projectUrl = normalizeProjectUrl(setup.projectUrl);
-  const serviceRoleKey = requireServiceRoleKey(setup.serviceRoleKey);
+export function createSupabaseVectorStore(
+  setup = {},
+  userId = null,
+  { accessToken = null, clientFactory = null } = {},
+) {
+  const normalizedUserId = normalizeUserId(userId);
   const table = normalizeTableName(setup.table);
   const dimensions = normalizeDimensions(setup.dimensions);
   const matchThreshold = normalizeMatchThreshold(setup.matchThreshold);
-  let clientPromise = null;
 
-  const getClient = async () => {
-    if (!clientPromise) {
-      clientPromise = Promise.resolve(clientFactory(projectUrl, serviceRoleKey));
-    }
-
-    return clientPromise;
-  };
+  const getClient = () => requireClient(
+    clientFactory ? clientFactory(accessToken) : getSupabaseDataClient(accessToken),
+  );
 
   return {
     provider: 'supabase',
@@ -121,7 +86,7 @@ export function createSupabaseVectorStore(setup = {}, { clientFactory = createDe
     matchThreshold,
 
     async testConnection() {
-      const client = await getClient();
+      const client = getClient();
       const { error } = await client.from(table).select('id').limit(1);
 
       if (error) {
@@ -132,8 +97,14 @@ export function createSupabaseVectorStore(setup = {}, { clientFactory = createDe
     },
 
     async clearDocumentIndex(documentId) {
-      const client = await getClient();
-      const { error } = await client.from(table).delete().eq('document_id', documentId);
+      if (!normalizedUserId) return;
+
+      const client = getClient();
+      const { error } = await client
+        .from(table)
+        .delete()
+        .eq('document_id', documentId)
+        .eq('user_id', normalizedUserId);
 
       if (error) {
         throw new Error(`Unable to clear Supabase vectors for document: ${error.message}`);
@@ -141,6 +112,10 @@ export function createSupabaseVectorStore(setup = {}, { clientFactory = createDe
     },
 
     async indexChunk({ document, chunk, vector, model }) {
+      if (!normalizedUserId) {
+        throw new Error('Authenticated user is required for Supabase VectorDB indexing.');
+      }
+
       const vectorValues = Array.from(vector ?? []);
 
       if (vectorValues.length !== dimensions) {
@@ -153,9 +128,10 @@ export function createSupabaseVectorStore(setup = {}, { clientFactory = createDe
         throw new Error('Document and chunk ids are required for Supabase indexing.');
       }
 
-      const client = await getClient();
+      const client = getClient();
       const { error } = await client.from(table).insert({
         id: `${document.id}:${chunk.id}:${model}`,
+        user_id: normalizedUserId,
         document_id: document.id,
         chunk_id: chunk.id,
         chunk_index: chunk.idx,
@@ -186,11 +162,12 @@ export function createSupabaseVectorStore(setup = {}, { clientFactory = createDe
         );
       }
 
-      const client = await getClient();
+      const client = getClient();
       const { data, error } = await client.rpc('match_embeddly_chunks', {
         query_embedding: vectorValues,
         match_embedding_model: model,
         match_project_id: projectId,
+        match_user_id: normalizedUserId || null,
         match_threshold: matchThreshold,
         match_count: limit,
       });

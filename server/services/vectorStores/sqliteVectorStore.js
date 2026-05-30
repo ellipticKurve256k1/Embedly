@@ -3,7 +3,13 @@ import { db, nowIso } from '../../db.js';
 import { blobToVector, cosineSimilarity, vectorToBlob } from '../embedder.js';
 import { toPublicVectorChunk } from './publicChunk.js';
 
-export function createSqliteVectorStore() {
+function normalizeUserId(userId) {
+  return String(userId ?? '').trim();
+}
+
+export function createSqliteVectorStore(userId = '') {
+  const normalizedUserId = normalizeUserId(userId);
+
   return {
     provider: 'sqlite',
 
@@ -30,7 +36,14 @@ export function createSqliteVectorStore() {
     },
 
     async retrieveChunks({ queryVector, model, projectId = null, limit }) {
-      const queryParams = projectId ? [model, projectId] : [model];
+      const queryParams = [model];
+      const userFilter = 'AND documents.user_id = ?';
+      queryParams.push(normalizedUserId);
+      const projectFilter = projectId ? 'AND documents.project_id = ?' : '';
+      if (projectId) {
+        queryParams.push(projectId);
+      }
+
       const rows = db.prepare(`
         SELECT
           embeddings.vector,
@@ -51,8 +64,10 @@ export function createSqliteVectorStore() {
         JOIN chunks ON chunks.id = embeddings.chunk_id
         JOIN documents ON documents.id = chunks.document_id
         LEFT JOIN projects ON projects.id = documents.project_id
+          AND projects.user_id = documents.user_id
         WHERE embeddings.model = ?
-          ${projectId ? 'AND documents.project_id = ?' : ''}
+          ${userFilter}
+          ${projectFilter}
       `).all(...queryParams);
 
       return rows

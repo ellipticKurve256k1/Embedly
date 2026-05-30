@@ -185,12 +185,9 @@ export default function SettingsPage() {
     vectorDbSetup?.provider ?? vectorDbProviders[0].id,
   );
   const [supabaseVectorDbFields, setSupabaseVectorDbFields] = useState({
-    projectUrl: vectorDbSetup?.projectUrl ?? '',
-    serviceRoleKey: vectorDbSetup?.serviceRoleKey ?? '',
     table: vectorDbSetup?.table ?? 'embeddly_chunks',
     dimensions: vectorDbSetup?.dimensions ?? 768,
     matchThreshold: vectorDbSetup?.matchThreshold ?? 0,
-    hasServiceRoleKey: Boolean(vectorDbSetup?.hasServiceRoleKey),
   });
   const [chunkingConfig, setChunkingConfig] = useState(readSavedChunkingConfig);
   const [rerankerConfig, setRerankerConfig] = useState(readSavedRerankerSetup);
@@ -254,12 +251,9 @@ export default function SettingsPage() {
     setVectorDbSetup(nextVectorDbSetup);
     setSelectedVectorDbProvider(nextVectorDbSetup?.provider ?? vectorDbProviders[0].id);
     setSupabaseVectorDbFields({
-      projectUrl: nextVectorDbSetup?.projectUrl ?? '',
-      serviceRoleKey: nextVectorDbSetup?.serviceRoleKey ?? '',
       table: nextVectorDbSetup?.table ?? 'embeddly_chunks',
-      dimensions: nextVectorDbSetup?.dimensions ?? 768,
+      dimensions: nextVectorDbSetup?.dimensions ?? 1024,
       matchThreshold: nextVectorDbSetup?.matchThreshold ?? 0,
-      hasServiceRoleKey: Boolean(nextVectorDbSetup?.hasServiceRoleKey),
     });
     setChunkingConfig(nextChunkingConfig);
     setRerankerConfig(nextRerankerConfig);
@@ -435,12 +429,9 @@ export default function SettingsPage() {
     if (savedSetup) {
       setVectorDbSetup(savedSetup);
       setSupabaseVectorDbFields({
-        projectUrl: savedSetup.projectUrl ?? supabaseVectorDbFields.projectUrl,
-        serviceRoleKey: savedSetup.serviceRoleKey ?? '',
         table: savedSetup.table ?? supabaseVectorDbFields.table,
         dimensions: savedSetup.dimensions ?? supabaseVectorDbFields.dimensions,
         matchThreshold: savedSetup.matchThreshold ?? supabaseVectorDbFields.matchThreshold,
-        hasServiceRoleKey: Boolean(savedSetup.hasServiceRoleKey),
       });
     }
   };
@@ -1141,9 +1132,7 @@ function VectorDbSettingsPanel({
 }) {
   const canSave = selectedProvider === 'sqlite'
     || (
-      isValidHttpUrl(supabaseFields.projectUrl)
-      && Boolean(String(supabaseFields.serviceRoleKey ?? '').trim() || supabaseFields.hasServiceRoleKey)
-      && Boolean(String(supabaseFields.table ?? '').trim())
+      Boolean(String(supabaseFields.table ?? '').trim())
       && Number.isInteger(Number(supabaseFields.dimensions))
       && Number(supabaseFields.dimensions) > 0
     );
@@ -1153,18 +1142,22 @@ function VectorDbSettingsPanel({
       <div className="settings-detail-heading">
         <h2 id="vector-db-title">VectorDB</h2>
         <p>
-          Choose where Embeddly stores vector indexes, chunk metadata, and retrieval-ready
-          embeddings.
+          Embeddly uses the server-detected vector store. Supabase is selected automatically
+          when server Supabase environment variables are configured.
         </p>
       </div>
 
-      <ProviderOptions
-        legend="Vector database options"
-        name="vector-db-provider"
-        providers={vectorDbProviders}
-        selectedProvider={selectedProvider}
-        onSelectProvider={onSelectProvider}
-      />
+      <div className="setup-message">
+        <Database size={18} />
+        <span>
+          Using {vectorDbSetup?.name ?? (selectedProvider === 'supabase' ? 'Supabase' : 'SQLite')} VectorDB
+          <small>
+            {selectedProvider === 'supabase'
+              ? 'Access is authenticated with the signed-in Supabase user token and scoped by user_id.'
+              : 'SQLite is the fallback when Supabase environment variables are absent.'}
+          </small>
+        </span>
+      </div>
 
       {ActiveProviderSetup && (
         <ActiveProviderSetup
@@ -1598,18 +1591,14 @@ function SQLiteVectorDbSetup() {
 
 function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
   const [isWarningVisible, setIsWarningVisible] = useState(true);
-  const projectUrl = fields.projectUrl ?? '';
-  const serviceRoleKey = fields.serviceRoleKey ?? '';
   const table = fields.table ?? 'embeddly_chunks';
   const dimensions = fields.dimensions ?? 768;
   const matchThreshold = fields.matchThreshold ?? 0;
-  const isProjectUrlValid = !projectUrl || isValidHttpUrl(projectUrl);
 
   const updateField = (field, value) => {
     onFieldsChange((currentFields) => ({
       ...currentFields,
       [field]: value,
-      ...(field === 'serviceRoleKey' ? { hasServiceRoleKey: Boolean(value) } : {}),
     }));
   };
 
@@ -1628,8 +1617,8 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
           <span>
             Supabase privacy warning
             <small>
-              Supabase mode sends chunk text and embeddings to the configured Supabase project.
-              The service role key is stored encrypted on the local server.
+              Supabase mode sends chunk text and embeddings to the server-configured Supabase
+              project. Row access should be protected with user_id RLS policies.
             </small>
           </span>
           <button
@@ -1648,48 +1637,13 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
         <span>
           Apply the Supabase SQL schema before saving.
           <small>
-            Use references/supabase-vector-schema.sql. The vector dimension must match the
-            embedding model output.
+            The table needs a user_id column, RLS policies, and a match_embeddly_chunks RPC
+            that accepts match_user_id.
           </small>
         </span>
       </div>
 
       <div className="settings-field-grid">
-        <label className="settings-field">
-          <span>
-            <strong>Project URL</strong>
-            <small>Supabase project URL, such as https://project-ref.supabase.co.</small>
-          </span>
-          <input
-            type="url"
-            value={projectUrl}
-            placeholder="https://project-ref.supabase.co"
-            aria-invalid={!isProjectUrlValid}
-            onChange={(event) => updateField('projectUrl', event.target.value)}
-          />
-        </label>
-
-        {!isProjectUrlValid && (
-          <div className="setup-message is-error">
-            <AlertCircle size={18} />
-            <span>Project URL must be an http(s) URL.</span>
-          </div>
-        )}
-
-        <label className="settings-field">
-          <span>
-            <strong>Service role key</strong>
-            <small>Server-only key used to write vectors and call the match RPC.</small>
-          </span>
-          <input
-            type="password"
-            value={serviceRoleKey}
-            placeholder={fields.hasServiceRoleKey ? 'Saved encrypted key' : 'service_role key'}
-            autoComplete="off"
-            onChange={(event) => updateField('serviceRoleKey', event.target.value)}
-          />
-        </label>
-
         <label className="settings-field">
           <span>
             <strong>Table name</strong>

@@ -23,6 +23,7 @@ export async function authContextMiddleware(request, _response, next) {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (!error && user?.id) {
       request.userId = user.id;
+      request.authToken = token;
     }
   } catch {
     // Proceed anonymously on any verification failure.

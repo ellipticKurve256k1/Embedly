@@ -26,7 +26,7 @@ function insertDocument(database, id = 'doc-1') {
 }
 
 test('SCHEMA_SQL includes all core tables', () => {
-  for (const tableName of ['projects', 'documents', 'chunks', 'embeddings', 'embedding_jobs', 'settings']) {
+  for (const tableName of ['projects', 'documents', 'chunks', 'embeddings', 'embedding_jobs', 'user_settings']) {
     assert.match(SCHEMA_SQL, new RegExp(`CREATE TABLE IF NOT EXISTS ${tableName}`));
   }
 });
@@ -38,10 +38,10 @@ test('initializeSchema creates documents table', () => {
   database.close();
 });
 
-test('initializeSchema creates settings table', () => {
+test('initializeSchema creates user_settings table', () => {
   const database = createMemoryDb();
-  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get();
-  assert.equal(row.name, 'settings');
+  const row = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'user_settings'").get();
+  assert.equal(row.name, 'user_settings');
   database.close();
 });
 
@@ -57,6 +57,17 @@ test('documents can be inserted and selected', () => {
   insertDocument(database);
   const row = database.prepare('SELECT * FROM documents WHERE id = ?').get('doc-1');
   assert.equal(row.filename, 'notes.txt');
+  assert.equal(row.user_id, '');
+  database.close();
+});
+
+test('initializeSchema creates user ownership columns', () => {
+  const database = createMemoryDb();
+  const projectColumns = database.prepare('PRAGMA table_info(projects)').all();
+  const documentColumns = database.prepare('PRAGMA table_info(documents)').all();
+
+  assert.ok(projectColumns.some((column) => column.name === 'user_id'));
+  assert.ok(documentColumns.some((column) => column.name === 'user_id'));
   database.close();
 });
 
@@ -125,57 +136,58 @@ test('embedding jobs can be inserted and updated', () => {
   database.close();
 });
 
-test('settings can be inserted and updated', () => {
+test('user settings can be inserted and updated', () => {
   const database = createMemoryDb();
-  database.prepare('INSERT INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)')
-    .run('chunking.config', '{"strategy":"fixed"}', 0, nowIso());
-  database.prepare('UPDATE settings SET value = ? WHERE key = ?').run('{"strategy":"recursive"}', 'chunking.config');
-  const row = database.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get('chunking.config');
+  database.prepare('INSERT INTO user_settings (user_id, key, value, encrypted, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run('user-1', 'chunking.config', '{"strategy":"fixed"}', 0, nowIso());
+  database.prepare('UPDATE user_settings SET value = ? WHERE user_id = ? AND key = ?')
+    .run('{"strategy":"recursive"}', 'user-1', 'chunking.config');
+  const row = database.prepare('SELECT value, encrypted FROM user_settings WHERE user_id = ? AND key = ?')
+    .get('user-1', 'chunking.config');
   assert.deepEqual(row, { value: '{"strategy":"recursive"}', encrypted: 0 });
   database.close();
 });
 
-test('initializeSchema repairs legacy user-scoped settings constraint', () => {
+test('initializeSchema migrates legacy settings into user_settings', () => {
   const database = new Database(':memory:');
   database.exec(`
     CREATE TABLE settings (
-      user_id TEXT NOT NULL DEFAULT '',
-      key TEXT NOT NULL,
+      key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       encrypted INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL,
-      PRIMARY KEY (user_id, key)
+      updated_at TEXT NOT NULL
     )
   `);
-  database.prepare('INSERT INTO settings (user_id, key, value, encrypted, updated_at) VALUES (?, ?, ?, ?, ?)')
-    .run('user-1', 'embedding.setup', '{"model":"user"}', 0, '2026-01-02T00:00:00.000Z');
-  database.prepare('INSERT INTO settings (user_id, key, value, encrypted, updated_at) VALUES (?, ?, ?, ?, ?)')
-    .run('', 'embedding.setup', '{"model":"global"}', 0, '2026-01-01T00:00:00.000Z');
+  database.prepare('INSERT INTO settings (key, value, encrypted, updated_at) VALUES (?, ?, ?, ?)')
+    .run('embedding.setup', '{"model":"global"}', 0, '2026-01-01T00:00:00.000Z');
 
   initializeSchema(database);
 
-  const columns = database.prepare('PRAGMA table_info(settings)').all();
-  assert.equal(columns.some((column) => column.name === 'user_id'), false);
-  assert.equal(columns.find((column) => column.name === 'key')?.pk, 1);
+  const settingsTable = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settings'").get();
+  assert.equal(settingsTable, undefined);
+  const row = database.prepare('SELECT user_id, value, encrypted FROM user_settings WHERE key = ?')
+    .get('embedding.setup');
+  assert.deepEqual(row, { user_id: '', value: '{"model":"global"}', encrypted: 0 });
+  database.close();
+});
 
-  database.prepare(`
-    INSERT INTO settings (key, value, encrypted, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET
-      value = excluded.value,
-      encrypted = excluded.encrypted,
-      updated_at = excluded.updated_at
-  `).run('embedding.setup', '{"model":"updated"}', 0, nowIso());
+test('projects allow duplicate names across users', () => {
+  const database = createMemoryDb();
+  database.prepare('INSERT INTO projects (id, user_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('project-1', 'user-1', 'Shared Name', null, nowIso());
+  database.prepare('INSERT INTO projects (id, user_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('project-2', 'user-2', 'Shared Name', null, nowIso());
 
-  const row = database.prepare('SELECT value, encrypted FROM settings WHERE key = ?').get('embedding.setup');
-  assert.deepEqual(row, { value: '{"model":"updated"}', encrypted: 0 });
+  const count = database.prepare('SELECT COUNT(*) AS count FROM projects WHERE name = ?')
+    .get('Shared Name').count;
+  assert.equal(count, 2);
   database.close();
 });
 
 test('deleting a project unassigns documents', () => {
   const database = createMemoryDb();
-  database.prepare('INSERT INTO projects (id, name, description, created_at) VALUES (?, ?, ?, ?)')
-    .run('project-1', 'Project One', null, nowIso());
+  database.prepare('INSERT INTO projects (id, user_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)')
+    .run('project-1', '', 'Project One', null, nowIso());
   insertDocument(database);
   database.prepare('UPDATE documents SET project_id = ? WHERE id = ?').run('project-1', 'doc-1');
   database.prepare('DELETE FROM projects WHERE id = ?').run('project-1');

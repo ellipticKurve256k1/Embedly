@@ -11,14 +11,15 @@ const SEARCH_RETRIEVAL_LIMIT = 5;
 router.get('/', async (request, response) => {
   const query = String(request.query.q ?? '').trim();
   const projectId = String(request.query.projectId ?? '').trim() || null;
+  const userId = String(request.userId ?? '').trim();
 
   if (!query) {
     response.status(400).json({ error: 'Search query is required.' });
     return;
   }
 
-  const embeddingSetup = getEmbeddingSetup() ?? {};
-  const rerankerSetup = getRerankerSetup() ?? {};
+  const embeddingSetup = await getEmbeddingSetup(userId, request.authToken) ?? {};
+  const rerankerSetup = await getRerankerSetup(userId, request.authToken) ?? {};
   const model = String(request.query.model || embeddingSetup.model || DEFAULT_EMBEDDING_MODEL).trim();
   const candidateLimit = rerankerSetup.candidateLimit ?? SEARCH_CANDIDATE_LIMIT;
   const topK = rerankerSetup.topK ?? SEARCH_RETRIEVAL_LIMIT;
@@ -28,7 +29,8 @@ router.get('/', async (request, response) => {
     topK,
     reranker: isRerankerEnabled(rerankerSetup) ? rerankerSetup : null,
     projectId,
-    userId: null,
+    userId,
+    accessToken: request.authToken ?? null,
   });
   const rerankerUsed = results.some((result) => typeof result.rerankScore === 'number');
 

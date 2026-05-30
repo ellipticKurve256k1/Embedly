@@ -72,16 +72,20 @@ function listRecentCompletedJobRows() {
   `).all(RECENT_COMPLETED_LIMIT);
 }
 
-function listDocumentsByIds(documentIds) {
+function normalizeUserId(userId) {
+  return String(userId ?? '').trim();
+}
+
+function listDocumentsByIds(documentIds, userId = '') {
   if (documentIds.length === 0) return [];
 
   const placeholders = documentIds.map(() => '?').join(', ');
   return db.prepare(`
     SELECT *
     FROM documents
-    WHERE id IN (${placeholders})
+    WHERE user_id = ? AND id IN (${placeholders})
     ORDER BY created_at ASC
-  `).all(...documentIds);
+  `).all(normalizeUserId(userId), ...documentIds);
 }
 
 class EmbedQueue {
@@ -120,7 +124,7 @@ class EmbedQueue {
 
   async enqueueDocuments(documentIds, options = {}) {
     const uniqueDocumentIds = [...new Set(documentIds)].filter(Boolean);
-    const documents = listDocumentsByIds(uniqueDocumentIds);
+    const documents = listDocumentsByIds(uniqueDocumentIds, options.userId);
 
     if (documents.length !== uniqueDocumentIds.length) {
       const error = new Error('One or more documents were not found.');
@@ -161,8 +165,9 @@ class EmbedQueue {
     const model = String(options.model || DEFAULT_EMBEDDING_MODEL).trim() || DEFAULT_EMBEDDING_MODEL;
     const jobId = uuidv4();
     const createdAt = nowIso();
-    const vectorDbSetup = getVectorDbSetup();
-    const vectorStore = createVectorStore(vectorDbSetup);
+    const userId = normalizeUserId(options.userId);
+    const vectorDbSetup = await getVectorDbSetup(userId, options.accessToken);
+    const vectorStore = createVectorStore(userId, vectorDbSetup, { accessToken: options.accessToken });
 
     clearDocumentIndex(document.id);
     await vectorStore.clearDocumentIndex(document.id);
@@ -178,6 +183,8 @@ class EmbedQueue {
     const queuedJob = {
       id: jobId,
       documentId: document.id,
+      userId,
+      accessToken: options.accessToken ?? null,
       chunking: options.chunking,
       model,
       vectorDbSetup,
@@ -261,7 +268,9 @@ class EmbedQueue {
         INSERT INTO chunks (id, document_id, idx, content, token_count, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
-      const vectorStore = createVectorStore(job.vectorDbSetup);
+      const vectorStore = createVectorStore(job.userId, job.vectorDbSetup, {
+        accessToken: job.accessToken,
+      });
       const indexedDocument = {
         ...document,
         chunk_count: chunks.length,
