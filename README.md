@@ -1,6 +1,6 @@
 # Embeddly
 
-Embeddly is a local-first RAG knowledge search app for private documents. It helps you upload files, turn them into searchable embeddings, explore semantic results, and chat with retrieved context while keeping the default data path on your machine.
+Embeddly is a ~~local-first~~ RAG knowledge search app for private documents. It helps you upload files, turn them into searchable embeddings, explore semantic results, and chat with retrieved context while keeping the default data path on your machine.
 
 The app is built around a search-first interface with document upload, project-scoped retrieval, a background embedding queue, source-aware chat, and configurable model/storage settings.
 
@@ -23,7 +23,7 @@ The app is built around a search-first interface with document upload, project-s
 ## Requirements
 
 - Node.js and npm.
-- Ollama for local embeddings and local chat models.
+- ~~Ollama for local embeddings and local chat models.~~
 - At least one Ollama embedding model, such as `nomic-embed-text`.
 - At least one Ollama chat model if you want fully local chat, such as `llama3.2`.
 - Supabase is optional and only needed if you switch VectorDB from SQLite to Supabase.
