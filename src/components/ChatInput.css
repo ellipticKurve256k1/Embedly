@@ -76,6 +76,32 @@
   stroke-width: 2;
 }
 
+.chat-input__stop {
+  width: 50px;
+  height: 50px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 14px;
+  color: #ffffff;
+  background: #9f4452;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.chat-input__stop:hover {
+  background: #8b3a47;
+  transform: translateY(-1px);
+}
+
+.chat-input__stop svg {
+  fill: currentColor;
+  stroke: none;
+}
+
 @media (max-width: 680px) {
   .chat-input {
     border-radius: 22px;
@@ -88,6 +114,11 @@
   }
 
   .chat-input__send {
+    width: 44px;
+    height: 44px;
+  }
+
+  .chat-input__stop {
     width: 44px;
     height: 44px;
   }

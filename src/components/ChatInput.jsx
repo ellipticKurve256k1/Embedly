@@ -1,9 +1,11 @@
-import { SendHorizontal } from 'lucide-react';
+import { SendHorizontal, Square } from 'lucide-react';
 import './ChatInput.css';
 
 export default function ChatInput({
   value,
   disabled,
+  isStreaming = false,
+  onStop,
   placeholder = 'Ask your knowledge base...',
   onChange,
   onSubmit,
@@ -39,14 +41,25 @@ export default function ChatInput({
           onKeyDown={handleKeyDown}
         />
       </label>
-      <button
-        className="chat-input__send"
-        type="submit"
-        disabled={!canSend}
-        aria-label="Send message"
-      >
-        <SendHorizontal size={20} />
-      </button>
+      {isStreaming ? (
+        <button
+          className="chat-input__stop"
+          type="button"
+          onClick={onStop}
+          aria-label="Stop generating"
+        >
+          <Square size={20} />
+        </button>
+      ) : (
+        <button
+          className="chat-input__send"
+          type="submit"
+          disabled={!canSend}
+          aria-label="Send message"
+        >
+          <SendHorizontal size={20} />
+        </button>
+      )}
     </form>
   );
 }

@@ -270,6 +270,10 @@ export default function ChatPanel({
     });
   }, []);
 
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
   const handleNewConversation = useCallback(async () => {
     abortControllerRef.current?.abort();
     await persistActiveConversation();
@@ -450,7 +454,15 @@ export default function ChatPanel({
       setMessagesState(completedMessages);
       await persistConversation(conversationId, completedMessages);
     } catch (error) {
-      if (error.name === 'AbortError') return;
+      if (error.name === 'AbortError') {
+        const abortedMessages = messagesRef.current
+          .filter((message) => !(message.id === assistantMessage.id && !message.content))
+          .map((message) => (
+            message.id === assistantMessage.id ? { ...message, isStreaming: false } : message
+          ));
+        setMessagesState(abortedMessages);
+        return;
+      }
 
       const errorMessage = error instanceof Error ? error.message : 'Chat generation failed.';
       setIsSearching(false);
@@ -498,6 +510,8 @@ export default function ChatPanel({
         <ChatInput
           value={inputValue}
           disabled={isStreaming}
+          isStreaming={isStreaming}
+          onStop={handleStop}
           onChange={setInputValue}
           onSubmit={handleSend}
         />
