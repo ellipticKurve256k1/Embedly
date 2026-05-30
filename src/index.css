@@ -47,7 +47,7 @@ input {
   height: 100%;
   overflow: auto;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: clamp(10px, 1.4vh, 16px);
   padding: clamp(12px, 1.8vw, 24px);
   background:
@@ -122,6 +122,13 @@ input {
   min-width: 0;
 }
 
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -137,7 +144,7 @@ input {
   .landing-shell {
     gap: 12px;
     padding: 14px;
-    grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   }
 
   .topbar {

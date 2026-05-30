@@ -264,6 +264,14 @@ export default function App() {
   return (
     <main className="app">
       <section className="landing-shell" aria-label="Embeddly">
+        <div className="topbar-status">
+          <ModelStatusBar
+            embeddingSetup={embeddingSetup}
+            llmSetup={llmSetup}
+            vectorDbSetup={vectorDbSetup}
+            rerankerSetup={hasReranker ? rerankerSetup : null}
+          />
+        </div>
         <header className="topbar">
           <img className="brand-logo" src={logoSrc} alt="Embeddly" />
           <ModeTabs
@@ -274,12 +282,6 @@ export default function App() {
           />
           <div className="topbar-actions">
             <EmbeddingIndicator />
-            <ModelStatusBar
-              embeddingSetup={embeddingSetup}
-              llmSetup={llmSetup}
-              vectorDbSetup={vectorDbSetup}
-              rerankerSetup={hasReranker ? rerankerSetup : null}
-            />
             <LoginButton />
             <a className="icon-button" href="#settings" aria-label="Open settings">
               <Settings size={20} />
