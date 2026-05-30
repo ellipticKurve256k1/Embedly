@@ -695,10 +695,6 @@ function RetrievalSettingsPanel({
         [field]: value,
       };
 
-      if (field === 'topK' && Number(value) > Number(nextConfig.candidateLimit)) {
-        nextConfig.candidateLimit = Number(value);
-      }
-
       if (field === 'candidateLimit' && Number(value) < Number(nextConfig.topK)) {
         nextConfig.topK = Number(value);
       }
@@ -768,7 +764,7 @@ function RetrievalSettingsPanel({
       <div className="settings-subsection">
         <div className="settings-subsection-heading">
           <h3>Chunking</h3>
-          <p>Control how uploaded documents are split before embedding and indexing.</p>
+          <p>Control how documents are split and how many results retrieval returns.</p>
         </div>
 
       <div className="settings-field-grid">
@@ -896,35 +892,59 @@ function RetrievalSettingsPanel({
           />
         </label>
 
-        <label className="settings-field">
-          <span>
-            <strong>Overlap</strong>
-            <small>
-              {chunkingConfig.strategy === 'fixed'
-                ? 'Characters repeated between adjacent fixed chunks.'
-                : 'Approximate tokens repeated between adjacent semantic chunks.'}
-            </small>
-          </span>
-          <input
-            min="0"
-            max={chunkingConfig.strategy === 'fixed' ? '500' : '200'}
-            step="10"
-            type="range"
-            value={chunkingConfig.strategy === 'fixed'
-              ? chunkingConfig.overlap
-              : chunkingConfig.overlapTokens}
-            onChange={(event) => updateConfig(
-              chunkingConfig.strategy === 'fixed' ? 'overlap' : 'overlapTokens',
-              Number(event.target.value),
-            )}
-          />
-          <em>
-            {chunkingConfig.strategy === 'fixed'
-              ? `${chunkingConfig.overlap} characters`
-              : `${chunkingConfig.overlapTokens} tokens`}
-          </em>
-        </label>
-      </div>
+<label className="settings-field">
+           <span>
+             <strong>Overlap</strong>
+             <small>
+               {chunkingConfig.strategy === 'fixed'
+                 ? 'Characters repeated between adjacent fixed chunks.'
+                 : 'Approximate tokens repeated between adjacent semantic chunks.'}
+             </small>
+           </span>
+           <input
+             min="0"
+             max={chunkingConfig.strategy === 'fixed' ? '500' : '200'}
+             step="10"
+             type="range"
+             value={chunkingConfig.strategy === 'fixed'
+               ? chunkingConfig.overlap
+               : chunkingConfig.overlapTokens}
+             onChange={(event) => updateConfig(
+               chunkingConfig.strategy === 'fixed' ? 'overlap' : 'overlapTokens',
+               Number(event.target.value),
+             )}
+           />
+           <em>
+             {chunkingConfig.strategy === 'fixed'
+               ? `${chunkingConfig.overlap} characters`
+               : `${chunkingConfig.overlapTokens} tokens`}
+           </em>
+         </label>
+
+         <label className="settings-field">
+           <span>
+             <strong>Results to return</strong>
+             <small>Number of chunks returned by search and chat retrieval.</small>
+           </span>
+           <input
+             min="1"
+             max="50"
+             step="1"
+             type="number"
+             value={rawTopK}
+             onChange={(event) => {
+               const raw = event.target.value;
+               setRawTopK(raw);
+               if (raw === '') return;
+               const parsed = parseInt(raw, 10);
+               if (!Number.isNaN(parsed)) {
+                 updateRerankerConfig('topK', parsed);
+               }
+             }}
+             onBlur={() => setRawTopK(String(rerankerConfig.topK))}
+           />
+         </label>
+       </div>
       </div>
 
       <div className="settings-subsection">
@@ -988,30 +1008,6 @@ function RetrievalSettingsPanel({
                   }
                 }}
                 onBlur={() => setRawCandidateLimit(String(rerankerConfig.candidateLimit))}
-              />
-            </label>
-
-            <label className="settings-field">
-              <span>
-                <strong>Top results to return</strong>
-                <small>Final chunks returned to chat and search after reranking.</small>
-              </span>
-              <input
-                min="1"
-                max="20"
-                step="1"
-                type="number"
-                value={rawTopK}
-                onChange={(event) => {
-                  const raw = event.target.value;
-                  setRawTopK(raw);
-                  if (raw === '') return;
-                  const parsed = parseInt(raw, 10);
-                  if (!Number.isNaN(parsed)) {
-                    updateRerankerConfig('topK', parsed);
-                  }
-                }}
-                onBlur={() => setRawTopK(String(rerankerConfig.topK))}
               />
             </label>
           </div>

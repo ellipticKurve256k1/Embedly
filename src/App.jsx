@@ -7,6 +7,7 @@ import {
   readSavedEmbeddingSetup,
   readSavedLlmSetup,
   readSavedVectorDbSetup,
+  readSavedRerankerSetup,
 } from './lib/storage.js';
 import { getProjects, searchQuery } from './lib/api.js';
 import './index.css';
@@ -66,6 +67,7 @@ export default function App() {
   const [embeddingSetup, setEmbeddingSetup] = useState(() => readSavedEmbeddingSetup());
   const [llmSetup, setLlmSetup] = useState(() => readSavedLlmSetup());
   const [vectorDbSetup, setVectorDbSetup] = useState(() => readSavedVectorDbSetup());
+  const [rerankerSetup, setRerankerSetup] = useState(() => readSavedRerankerSetup());
   const [settingsStatus, setSettingsStatus] = useState('loading');
   const [settingsError, setSettingsError] = useState('');
 
@@ -82,6 +84,7 @@ export default function App() {
     setEmbeddingSetup(readSavedEmbeddingSetup());
     setLlmSetup(readSavedLlmSetup());
     setVectorDbSetup(readSavedVectorDbSetup());
+    setRerankerSetup(readSavedRerankerSetup());
   }, []);
 
   const refreshProjects = useCallback(async () => {
@@ -160,6 +163,7 @@ export default function App() {
     llmSetup,
     vectorDbSetup,
   });
+  const hasReranker = rerankerSetup?.enabled === true;
   const guardedModes = settingsReady ? [] : ['chat', 'search'];
 
   const handleNavigateToSettings = useCallback(() => {
@@ -274,6 +278,7 @@ export default function App() {
               embeddingSetup={embeddingSetup}
               llmSetup={llmSetup}
               vectorDbSetup={vectorDbSetup}
+              rerankerSetup={hasReranker ? rerankerSetup : null}
             />
             <LoginButton />
             <a className="icon-button" href="#settings" aria-label="Open settings">
