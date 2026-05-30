@@ -747,7 +747,14 @@ function RetrievalSettingsPanel({
               step="50"
               type="number"
               value={chunkingConfig.maxChunkSize}
-              onChange={(event) => updateConfig('maxChunkSize', Number(event.target.value))}
+              onChange={(event) => {
+                const raw = event.target.value;
+                if (raw === '') return;
+                const parsed = parseInt(raw, 10);
+                if (!Number.isNaN(parsed)) {
+                  updateConfig('maxChunkSize', parsed);
+                }
+              }}
             />
           </label>
         ) : (
@@ -762,7 +769,14 @@ function RetrievalSettingsPanel({
                 step="25"
                 type="number"
                 value={chunkingConfig.targetTokens}
-                onChange={(event) => updateConfig('targetTokens', Number(event.target.value))}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === '') return;
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isNaN(parsed)) {
+                    updateConfig('targetTokens', parsed);
+                  }
+                }}
               />
             </label>
 
@@ -776,7 +790,14 @@ function RetrievalSettingsPanel({
                 step="25"
                 type="number"
                 value={chunkingConfig.maxTokens}
-                onChange={(event) => updateConfig('maxTokens', Number(event.target.value))}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === '') return;
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isNaN(parsed)) {
+                    updateConfig('maxTokens', parsed);
+                  }
+                }}
               />
             </label>
           </>
@@ -798,10 +819,17 @@ function RetrievalSettingsPanel({
             value={chunkingConfig.strategy === 'fixed'
               ? chunkingConfig.minChunkSize
               : chunkingConfig.minTokens}
-            onChange={(event) => updateConfig(
-              chunkingConfig.strategy === 'fixed' ? 'minChunkSize' : 'minTokens',
-              Number(event.target.value),
-            )}
+            onChange={(event) => {
+              const raw = event.target.value;
+              if (raw === '') return;
+              const parsed = parseInt(raw, 10);
+              if (!Number.isNaN(parsed)) {
+                updateConfig(
+                  chunkingConfig.strategy === 'fixed' ? 'minChunkSize' : 'minTokens',
+                  parsed,
+                );
+              }
+            }}
           />
         </label>
 
@@ -887,7 +915,14 @@ function RetrievalSettingsPanel({
                 step="1"
                 type="number"
                 value={rerankerConfig.candidateLimit}
-                onChange={(event) => updateRerankerConfig('candidateLimit', Number(event.target.value))}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === '') return;
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isNaN(parsed)) {
+                    updateRerankerConfig('candidateLimit', parsed);
+                  }
+                }}
               />
             </label>
 
@@ -902,7 +937,14 @@ function RetrievalSettingsPanel({
                 step="1"
                 type="number"
                 value={rerankerConfig.topK}
-                onChange={(event) => updateRerankerConfig('topK', Number(event.target.value))}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  if (raw === '') return;
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isNaN(parsed)) {
+                    updateRerankerConfig('topK', parsed);
+                  }
+                }}
               />
             </label>
           </div>
@@ -1593,7 +1635,14 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
   const [isWarningVisible, setIsWarningVisible] = useState(true);
   const table = fields.table ?? 'embeddly_chunks';
   const dimensions = fields.dimensions ?? 768;
-  const matchThreshold = fields.matchThreshold ?? 0;
+
+  const [rawThreshold, setRawThreshold] = useState(
+    String(fields.matchThreshold ?? 0),
+  );
+
+  useEffect(() => {
+    setRawThreshold(String(fields.matchThreshold ?? 0));
+  }, [fields.matchThreshold]);
 
   const updateField = (field, value) => {
     onFieldsChange((currentFields) => ({
@@ -1668,7 +1717,14 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
             step="1"
             type="number"
             value={dimensions}
-            onChange={(event) => updateField('dimensions', Number(event.target.value))}
+            onChange={(event) => {
+              const raw = event.target.value;
+              if (raw === '') return;
+              const parsed = parseInt(raw, 10);
+              if (!Number.isNaN(parsed)) {
+                updateField('dimensions', parsed);
+              }
+            }}
           />
         </label>
 
@@ -1682,8 +1738,15 @@ function SupabaseVectorDbSetup({ fields, onFieldsChange }) {
             max="1"
             step="0.01"
             type="number"
-            value={matchThreshold}
-            onChange={(event) => updateField('matchThreshold', Number(event.target.value))}
+            value={rawThreshold}
+            onChange={(event) => {
+              const raw = event.target.value;
+              setRawThreshold(raw);
+              const parsed = parseFloat(raw);
+              if (!Number.isNaN(parsed)) {
+                updateField('matchThreshold', parsed);
+              }
+            }}
           />
         </label>
       </div>
