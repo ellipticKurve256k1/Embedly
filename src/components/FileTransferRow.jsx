@@ -101,6 +101,7 @@ export default function FileTransferRow({
   const isActive = ACTIVE_STATUSES.has(displayStatus);
   const isKnowledge = variant === 'knowledge';
   const isSelectable = !isKnowledge || statusGroup === 'pending' || statusGroup === 'failed';
+  const isSettled = isKnowledge && statusGroup === 'completed';
   const knowledgeStatus = getKnowledgeStatus(displayStatus);
   const showReembed = isKnowledge && statusGroup === 'completed';
   const showRetry = isKnowledge && statusGroup === 'failed';
@@ -115,6 +116,7 @@ export default function FileTransferRow({
         `is-${displayStatus}`,
         isSelected ? 'is-selected' : '',
         !isSelectable ? 'is-disabled' : '',
+        isSettled ? 'is-settled' : '',
       ].filter(Boolean).join(' ')}
     >
       <label className="transfer-row-check">

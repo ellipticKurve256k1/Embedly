@@ -27,6 +27,50 @@
   background: rgba(248, 250, 255, 0.58);
 }
 
+.transfer-row.is-settled {
+  background: rgba(225, 228, 240, 0.45);
+  border-color: rgba(132, 146, 184, 0.08);
+  color: #a0a8bc;
+}
+
+.transfer-row.is-settled .transfer-row-title strong {
+  color: #8c96ad;
+  font-weight: 700;
+}
+
+.transfer-row.is-settled .file-type-icon {
+  opacity: 0.55;
+}
+
+.transfer-row.is-settled .transfer-chunk-count {
+  color: #8c96ad;
+  background: rgba(132, 146, 184, 0.10);
+}
+
+.transfer-row.is-settled .transfer-status-badge.is-completed {
+  color: #6fa890;
+  background: rgba(47, 123, 95, 0.08);
+}
+
+.transfer-row.is-settled .transfer-meta-separator {
+  color: #cdd2de;
+}
+
+.transfer-row.is-settled .transfer-project-select {
+  color: #a0a8bc;
+  background: rgba(225, 228, 240, 0.55);
+}
+
+.transfer-row.is-settled .transfer-row-remove {
+  color: #c0c6d4;
+}
+
+.transfer-row.is-settled:hover {
+  background: rgba(233, 236, 246, 0.62);
+  border-color: rgba(132, 146, 184, 0.12);
+  box-shadow: none;
+}
+
 .transfer-row.is-uploading {
   color: #6258ff;
 }
